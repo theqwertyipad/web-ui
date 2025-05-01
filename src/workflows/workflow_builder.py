@@ -8,9 +8,9 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import PromptTemplate
 
-from browser_use.controller.service import Controller
-from browser_use.workflows.prompts import workflow_builder_template
-from browser_use.workflows.workflow import Workflow
+from .controller.service import WorkflowController
+from .prompts import workflow_builder_template
+from .workflow import Workflow
 
 EXAMPLE_YAML_PATH = Path(__file__).with_name('linkedin_workflow.yaml')
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _available_actions_markdown() -> str:
 	"""Return a bullet list with available deterministic actions and their descriptions."""
-	controller = Controller()
+	controller = WorkflowController()
 	lines: list[str] = []
 	for action in controller.registry.registry.actions.values():
 		lines.append(f'- **{action.name}**: {action.description}')

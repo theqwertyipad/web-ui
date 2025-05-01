@@ -18,7 +18,8 @@ from browser_use.agent.service import Agent
 from browser_use.agent.views import ActionResult, AgentHistoryList
 from browser_use.browser.browser import Browser
 from browser_use.browser.context import BrowserContext
-from .controller.controller import WorkflowController
+
+from .controller.service import WorkflowController
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,8 @@ class Workflow:
 			raise FileNotFoundError(self.yaml_path)
 
 		self.controller = controller or WorkflowController()
+		logger.info("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+		logger.info(self.controller.registry.registry.actions)
 		self.browser = browser or Browser()
 		self.llm = llm
 		self.fallback_to_agent = fallback_to_agent
