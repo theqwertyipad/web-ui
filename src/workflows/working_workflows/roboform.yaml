@@ -1,0 +1,135 @@
+name: Form Filling Workflow
+description: Automatically fill out a form with text inputs and select options.
+inputs:
+  type: object
+  properties:
+    title: 
+      type: string
+    first_name: 
+      type: string
+    middle_initial: 
+      type: string
+    last_name: 
+      type: string
+    full_name: 
+      type: string
+    company: 
+      type: string
+    position: 
+      type: string
+    zip_code: 
+      type: string
+    birth_place: 
+      type: string
+  required: 
+    - title
+    - first_name
+    - middle_initial
+    - last_name
+    - full_name
+    - company
+    - position
+    - zip_code
+    - birth_place
+steps:
+  - type: deterministic
+    description: Open the form page in a new tab
+    action: open_tab
+    params:
+      url: "https://www.roboform.com/filling-test-all-fields"
+  - type: deterministic
+    description: Input title
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"01___title\"]"
+      text: "{title}"
+  - type: deterministic
+    description: Input first name
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"02frstname\"]"
+      text: "{first_name}"
+  - type: deterministic
+    description: Input middle initial
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"03middle_i\"]"
+      text: "{middle_initial}"
+  - type: deterministic
+    description: Input last name
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"04lastname\"]"
+      text: "{last_name}"
+  - type: deterministic
+    description: Input full name
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"04fullname\"]"
+      text: "{full_name}"
+  - type: deterministic
+    description: Input company name
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"05_company\"]"
+      text: "{company}"
+  - type: deterministic
+    description: Input position
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"06position\"]"
+      text: "{position}"
+  - type: deterministic
+    description: Input zip code
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"16addr_zip\"]"
+      text: "{zip_code}"
+  - type: deterministic
+    description: Select card type as Visa
+    action: select_dropdown_option_by_selector_and_text
+    params:
+      selector: "select[name=\"40cc__type\"]"
+      text: "Visa (Preferred)"
+  - type: deterministic
+    description: Select expiration month as May
+    action: select_dropdown_option_by_selector_and_text
+    params:
+      selector: "select[name=\"42ccexp_mm\"]"
+      text: "05"
+  - type: deterministic
+    description: Select expiration year as 2032
+    action: select_dropdown_option_by_selector_and_text
+    params:
+      selector: "select[name=\"43ccexp_yy\"]"
+      text: "2032"
+  - type: deterministic
+    description: Select birth month as November
+    action: select_dropdown_option_by_selector_and_text
+    params:
+      selector: "select[name=\"66mm\"]"
+      text: "Nov"
+  - type: deterministic
+    description: Select birth day as 14
+    action: select_dropdown_option_by_selector_and_text
+    params:
+      selector: "select[name=\"67dd\"]"
+      text: "14"
+  - type: deterministic
+    description: Select birth year as 1933
+    action: select_dropdown_option_by_selector_and_text
+    params:
+      selector: "select[name=\"68yy\"]"
+      text: "1933"
+  - type: deterministic
+    description: Input birth place
+    action: input_text_by_css_selector
+    params:
+      selector: "input[type=\"text\"][name=\"67birth_pl\"]"
+      text: "{birth_place}"
+  - type: deterministic
+    description: Complete the form filling task
+    action: done
+    params:
+      text: "Form filling completed"
+      success: true
