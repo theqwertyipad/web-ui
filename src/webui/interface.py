@@ -1,11 +1,12 @@
 import gradio as gr
 
-from src.webui.webui_manager import WebuiManager
 from src.webui.components.agent_settings_tab import create_agent_settings_tab
 from src.webui.components.browser_settings_tab import create_browser_settings_tab
 from src.webui.components.browser_use_agent_tab import create_browser_use_agent_tab
 from src.webui.components.deep_research_agent_tab import create_deep_research_agent_tab
 from src.webui.components.load_save_config_tab import create_load_save_config_tab
+from src.webui.components.workflows_tab import create_workflows_tab
+from src.webui.webui_manager import WebuiManager
 
 theme_map = {
     "Default": gr.themes.Default(),
@@ -15,7 +16,7 @@ theme_map = {
     "Origin": gr.themes.Origin(),
     "Citrus": gr.themes.Citrus(),
     "Ocean": gr.themes.Ocean(),
-    "Base": gr.themes.Base()
+    "Base": gr.themes.Base(),
 }
 
 
@@ -57,7 +58,10 @@ def create_ui(theme_name="Ocean"):
     ui_manager = WebuiManager()
 
     with gr.Blocks(
-            title="Browser Use WebUI", theme=theme_map[theme_name], css=css, js=js_func,
+        title="Browser Use WebUI",
+        theme=theme_map[theme_name],
+        css=css,
+        js=js_func,
     ) as demo:
         with gr.Row():
             gr.Markdown(
@@ -91,5 +95,8 @@ def create_ui(theme_name="Ocean"):
 
             with gr.TabItem("📁 Load & Save Config"):
                 create_load_save_config_tab(ui_manager)
+
+            with gr.TabItem("🛠️ Workflows"):
+                create_workflows_tab(ui_manager)
 
     return demo
