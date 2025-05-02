@@ -1,11 +1,12 @@
-import gradio as gr
 import logging
-from gradio.components import Component
 
+import gradio as gr
+
+from src.utils import extension_loader
 from src.webui.webui_manager import WebuiManager
-from src.utils import config
 
 logger = logging.getLogger(__name__)
+
 
 async def close_browser(webui_manager: WebuiManager):
     """
@@ -25,6 +26,7 @@ async def close_browser(webui_manager: WebuiManager):
         await webui_manager.bu_browser.close()
         webui_manager.bu_browser = None
 
+
 def create_browser_settings_tab(webui_manager: WebuiManager):
     """
     Creates a browser settings tab.
@@ -38,7 +40,7 @@ def create_browser_settings_tab(webui_manager: WebuiManager):
                 label="Browser Binary Path",
                 lines=1,
                 interactive=True,
-                placeholder="e.g. '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome'"
+                placeholder="e.g. '/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome'",
             )
             browser_user_data_dir = gr.Textbox(
                 label="Browser User Data Dir",
@@ -52,25 +54,31 @@ def create_browser_settings_tab(webui_manager: WebuiManager):
                 label="Use Own Browser",
                 value=False,
                 info="Use your existing browser instance",
-                interactive=True
+                interactive=True,
             )
             keep_browser_open = gr.Checkbox(
                 label="Keep Browser Open",
                 value=True,
                 info="Keep Browser Open between Tasks",
-                interactive=True
+                interactive=True,
             )
             headless = gr.Checkbox(
                 label="Headless Mode",
                 value=False,
                 info="Run browser without GUI",
-                interactive=True
+                interactive=True,
             )
             disable_security = gr.Checkbox(
                 label="Disable Security",
                 value=False,
                 info="Disable browser security",
-                interactive=True
+                interactive=True,
+            )
+            load_recorder_extension = gr.Checkbox(
+                label="Load Workflow Recorder Extension",
+                value=False,
+                info="Load the workflow recorder Chrome extension",
+                interactive=True,
             )
 
     with gr.Group():
@@ -79,13 +87,13 @@ def create_browser_settings_tab(webui_manager: WebuiManager):
                 label="Window Width",
                 value=1280,
                 info="Browser window width",
-                interactive=True
+                interactive=True,
             )
             window_h = gr.Number(
                 label="Window Height",
                 value=1100,
                 info="Browser window height",
-                interactive=True
+                interactive=True,
             )
     with gr.Group():
         with gr.Row():
@@ -144,6 +152,7 @@ def create_browser_settings_tab(webui_manager: WebuiManager):
             wss_url=wss_url,
             window_h=window_h,
             window_w=window_w,
+            load_recorder_extension=load_recorder_extension,
         )
     )
     webui_manager.add_components("browser_settings", tab_components)
@@ -152,7 +161,26 @@ def create_browser_settings_tab(webui_manager: WebuiManager):
         """Wrapper for handle_clear."""
         await close_browser(webui_manager)
 
+    # Check if the extension is available and show a status message
+    if extension_loader.get_extension_path():
+        extension_info = gr.Markdown(
+            f"✅ Workflow recorder extension found at: {extension_loader.get_extension_path()}"
+        )
+    else:
+        extension_info = gr.Markdown(
+            "❌ Workflow recorder extension not found. You can still use the JS injection method."
+        )
+
+    # Add extension_info to tab_components
+    tab_components.update(
+        dict(
+            extension_info=extension_info,
+        )
+    )
+
+    # Add the event handlers
     headless.change(close_wrapper)
     keep_browser_open.change(close_wrapper)
     disable_security.change(close_wrapper)
     use_own_browser.change(close_wrapper)
+    load_recorder_extension.change(close_wrapper)
