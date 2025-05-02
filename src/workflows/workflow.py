@@ -53,7 +53,6 @@ class Workflow:
 			raise FileNotFoundError(self.yaml_path)
 
 		self.controller = controller or WorkflowController()
-		logger.info("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
 		logger.info(self.controller.registry.registry.actions)
 		self.browser = browser or Browser()
 		self.llm = llm
@@ -103,12 +102,17 @@ class Workflow:
 		action_model = ActionModel(**{action_name: params})
 
 		try:
-			return await asyncio.wait_for(
-				self.controller.act(action_model, self.browser_context),
-				timeout=timeout,
-			)
+			# Create a task for the controller action
+			action_task = self.controller.act(action_model, self.browser_context)
+			
+			# Wait for either completion or timeout
+			return await asyncio.wait_for(action_task, timeout=timeout)
+			
 		except asyncio.TimeoutError:
 			raise TimeoutError(f"Deterministic action '{action_name}' exceeded the timeout of {timeout} s")
+		except Exception as e:
+			# Catch any other errors from the controller action
+			raise RuntimeError(f"Deterministic action '{action_name}' failed: {str(e)}")
 
 	async def _run_agent_step(self, step: Dict[str, Any]) -> AgentHistoryList | dict[str, Any]:
 		"""Spin-up a one-off Agent to accomplish an open-ended task OR direct structured-output call."""
