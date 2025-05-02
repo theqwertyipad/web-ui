@@ -126,6 +126,12 @@
   toggleHistoryBtn.onclick = () => {
     const isVisible = sidePanel.style.display !== 'none';
     sidePanel.style.display = isVisible ? 'none' : 'block';
+    if (!isVisible) {
+      const rect = overlay.getBoundingClientRect();
+      sidePanel.style.top = `${rect.top}px`;
+      sidePanel.style.left = `${rect.left - sidePanel.offsetWidth - 20}px`;
+      sidePanel.style.right = 'auto';
+    }
   };
 
   // Stop button
