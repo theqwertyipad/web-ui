@@ -1,0 +1,29 @@
+name: Open Last Email and Respond
+description: Open the last email and respond with a message
+inputs:
+  type: object
+  properties: {}
+  required: []
+steps:
+  - type: deterministic
+    description: Open a new tab to prevent disruption of existing tabs
+    action: open_tab
+    params:
+      url: "https://mail.google.com"
+
+  - type: agent
+    description: Locate and open the last email
+    task: Open the last email
+    max_steps: 5
+
+  - type: agent
+    description: Respond to the email with a message
+    task: Type and send a response message
+    max_steps: 5
+
+  - type: done
+    description: Mark the workflow as completed
+    action: done
+    params:
+      text: "Email opened and responded to."
+      success: true

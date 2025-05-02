@@ -20,3 +20,15 @@ Working and non working workflows are in their relative folders
 - whatsapp works
 - slack does not work because of a tab switch, slack opens a new tab.
 - forms are as painful to fill this way, plus the workflow is not great. I think a very cool thing to do would be to have the LLM also filling input for other tasks, for instance, in the current format to fill a form automatically I need to basically fill another format, suppose for instance instead I wanted to send a document or something like this. MY MCP mind tells me that this could be done by transforming the workflow into a tool and having an LLM calling the workflow with the desired arguments. 
+- linkedin accept invitation if certain condition
+
+Multi Selector: 
+ - pierce
+ - aria
+ - xpath
+ - css selector
+
+
+
+ # TODO
+ - [] The recorder records each key press input when inputting a text, i.e. it is not debounced, and for each one we save a screenshot. For now in workflow_builder I will discard those screnshot as they do not add value (just one more letter) but they make the api call expensive and slow af

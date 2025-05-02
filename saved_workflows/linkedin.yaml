@@ -1,0 +1,70 @@
+name: LinkedIn Messaging Automation
+description: Automate sending messages on LinkedIn
+inputs:
+  type: object
+  properties:
+    contact_name:
+      type: string
+    message_text:
+      type: string
+  required: [contact_name, message_text]
+steps:
+  - type: deterministic
+    description: Open LinkedIn in a new tab
+    action: open_tab
+    params:
+      url: "https://www.linkedin.com"
+  - type: deterministic
+    description: Click on the search bar
+    action: click_element_by_css_selector
+    params:
+      selector: "input[placeholder='Search']"
+  - type: deterministic
+    description: Input contact name in the search bar
+    action: input_text_by_css_selector
+    params:
+      selector: "input[placeholder='Search']"
+      text: "{contact_name}"
+  - type: deterministic
+    description: Press Enter to search
+    action: send_keys
+    params:
+      keys: "Enter"
+  - type: deterministic
+    description: Click on the Messaging tab
+    action: click_element_by_css_selector
+    params:
+      selector: "span[title='Messaging']"
+  - type: deterministic
+    description: Search for contact in messages
+    action: input_text_by_css_selector
+    params:
+      selector: "input[placeholder*='Search messages']"
+      text: "{contact_name}"
+  - type: deterministic
+    description: Press Enter to search in messages
+    action: send_keys
+    params:
+      keys: "Enter"
+  - type: deterministic
+    description: Click on the conversation with contact
+    action: click_element_by_css_selector
+    params:
+      selector: "div.msg-conversation-card__message-snippet-container.flex-grow-1"
+  - type: deterministic
+    description: Input message text
+    action: input_text_by_css_selector
+    params:
+      selector: "div.msg-form__contenteditable"
+      text: "{message_text}"
+  - type: deterministic
+    description: Click send button
+    action: click_element_by_css_selector
+    params:
+      selector: "button.msg-form__send-button.artdeco-button.artdeco-button--1[type='submit']"
+  - type: deterministic
+    description: Task completed
+    action: done
+    params:
+      text: "Message sent successfully"
+      success: true
