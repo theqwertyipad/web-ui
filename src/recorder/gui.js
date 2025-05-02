@@ -95,7 +95,7 @@
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    display: 'none', // ⛔ hidden until enabled via setRecordingState
+    display: 'inline-block',
   });
 
   header.appendChild(title);
@@ -261,12 +261,10 @@
     recordingState = state;
 
     // 🔁 Always show toggle button when not recording
-    toggleBtn.style.display = state ? 'inline-block' : 'none';
+    toggleBtn.style.display = 'inline-block';
     refreshBtn.style.display = state ? 'inline-block' : 'none';
     toggleBtn.textContent = state ? 'Stop' : 'Start';
     toggleBtn.style.background = state ? '#e53935' : '#4CAF50';
-
-    printToOutput(state ? '▶️ Recording started' : '⏹️ Recording stopped');
 
     if (state) {
       attachListenersToHighlightedElements();
@@ -352,6 +350,7 @@
     const newState = !isRecording();
     setRecordingState(newState);
     window.notifyPython?.('control', { action: newState ? 'start' : 'finish' });
+    printToOutput(newState ? '▶️ Recording started' : '⏹️ Recording stopped');
   };
 
   const printToOutput = (text) => {
