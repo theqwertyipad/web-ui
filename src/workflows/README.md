@@ -32,3 +32,5 @@ Multi Selector:
 
  # TODO
  - [] The recorder records each key press input when inputting a text, i.e. it is not debounced, and for each one we save a screenshot. For now in workflow_builder I will discard those screnshot as they do not add value (just one more letter) but they make the api call expensive and slow af
+ - [] This form would be much better filled with xpaths instead of css selectors, we have to find a way to loop xpaths in. 
+ https://www.clinical-partners.co.uk/for-adults/autism-and-aspergers/adult-autism-test/adult-autism-test-results/results
