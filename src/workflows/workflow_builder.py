@@ -68,7 +68,7 @@ def _event_to_messages(event: dict, include_screenshot: bool) -> list[dict[str, 
 	messages.append({'type': 'text', 'text': json.dumps(pruned, indent=2)})
 
 	# 2-3) optional screenshot if requested and available
-	if not include_screenshot:
+	if not include_screenshot or event.get('type') == 'input':
 		return messages
 
 	# Accept both top-level and nested variants
@@ -87,7 +87,6 @@ def _event_to_messages(event: dict, include_screenshot: bool) -> list[dict[str, 
 		return messages
 
 	meta = f'Screenshot for event {event.get("type", "unknown")} @ {event.get("timestamp", "")}'
-	logger.warning(meta)
 	messages.append({'type': 'text', 'text': meta})
 	messages.append(
 		{
