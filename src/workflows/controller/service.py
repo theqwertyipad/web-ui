@@ -29,7 +29,7 @@ class WorkflowController(Controller):
         ) -> ActionResult:
             """Navigate to the given URL."""
             await self.registry.execute_action(
-                action_name="open_tab", params=params.model_dump(), browser=browser
+                action_name="go_to_url", params=params.model_dump(), browser=browser
             )
             msg = f"🔗  Navigated to URL: {params.url}"
             logger.info(msg)
