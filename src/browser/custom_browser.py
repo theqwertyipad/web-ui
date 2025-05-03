@@ -1,17 +1,17 @@
 import asyncio
 import pdb
 
-from playwright.async_api import Browser as PlaywrightBrowser
-from playwright.async_api import (
+from patchright.async_api import Browser as PlaywrightBrowser
+from patchright.async_api import (
     BrowserContext as PlaywrightBrowserContext,
 )
-from playwright.async_api import (
+from patchright.async_api import (
     Playwright,
     async_playwright,
 )
 from browser_use.browser.browser import Browser, IN_DOCKER
 from browser_use.browser.context import BrowserContext, BrowserContextConfig
-from playwright.async_api import BrowserContext as PlaywrightBrowserContext
+from patchright.async_api import BrowserContext as PlaywrightBrowserContext
 import logging
 
 from browser_use.browser.chrome import (
