@@ -169,7 +169,7 @@ async def test_browser_use_agent():
 async def test_browser_use_parallel():
     from browser_use.browser.context import BrowserContextWindowSize
     from browser_use.browser.browser import BrowserConfig
-    from playwright.async_api import async_playwright
+    from patchright.async_api import async_playwright
     from browser_use.browser.browser import Browser
     from src.browser.custom_context import BrowserContextConfig
     from src.controller.custom_controller import CustomController
