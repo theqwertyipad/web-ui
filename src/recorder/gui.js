@@ -414,6 +414,16 @@
     // Check if the click is on the recorder UI
     if (overlay.contains(event.target)) return;
 
+    // If currentTypedText is not empty, send elementType event
+    if (currentTypedText) {
+      console.log('sending type-then-click');
+      window.notifyPython?.('elementType', {
+        text: currentTypedText,
+        mode: 'type-then-click',
+      });
+      currentTypedText = ''; // Clear the typed text after sending
+    }
+
     // Gather all attributes of the clicked element
     const attributes = {};
     for (let attr of event.target.attributes) {
