@@ -8,7 +8,7 @@ from .views import (
     ClickElementDeterministicAction,
     InputTextDeterministicAction,
     KeyPressDeterministicAction,
-    NavigateAction,
+    NavigationAction,
     ScrollDeterministicAction,
     SelectDropdownOptionDeterministicAction,
 )
@@ -23,9 +23,9 @@ class WorkflowController(Controller):
 
     def __register_actions(self):
         # Navigate to URL ------------------------------------------------------------
-        @self.registry.action("Navigate to URL", param_model=NavigateAction)
-        async def navigate(
-            params: NavigateAction, browser: BrowserContext
+        @self.registry.action("Navigate to URL", param_model=NavigationAction)
+        async def navigation(
+            params: NavigationAction, browser: BrowserContext
         ) -> ActionResult:
             """Navigate to the given URL."""
             await self.registry.execute_action(
@@ -42,12 +42,12 @@ class WorkflowController(Controller):
         async def click(
             params: ClickElementDeterministicAction, browser: BrowserContext
         ) -> ActionResult:
-            """Click the first element matching *params.selector*."""
+            """Click the first element matching *params.cssSelector*."""
             timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
-            print(f"Clicking element with selector: {params.selector}")
-            await page.click(params.selector, timeout=timeout_ms, force=True)
-            msg = f"🖱️  Clicked element with CSS selector: {params.selector}"
+            print(f"Clicking element with selector: {params.cssSelector}")
+            await page.click(params.cssSelector, timeout=timeout_ms, force=True)
+            msg = f"🖱️  Clicked element with CSS selector: {params.cssSelector}"
             logger.info(msg)
             return ActionResult(extracted_content=msg, include_in_memory=True)
 
@@ -61,21 +61,21 @@ class WorkflowController(Controller):
             browser: BrowserContext,
             has_sensitive_data: bool = False,
         ) -> ActionResult:
-            """Fill text into the element located with *params.selector*."""
+            """Fill text into the element located with *params.cssSelector*."""
             timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
-            print(f"Filling text into element with selector: {params.selector}")
+            print(f"Filling text into element with selector: {params.cssSelector}")
             print("Params: ", params)
-            is_select = await page.locator(params.selector).evaluate(
+            is_select = await page.locator(params.cssSelector).evaluate(
                 '(el) => el.tagName === "SELECT"'
             )
             if is_select:
                 # TODO: Not sure why there is an input event before a select event
                 return ActionResult(extracted_content="Ignored input into select element", include_in_memory=True)
             else:
-                await page.fill(params.selector, params.text, timeout=timeout_ms)
+                await page.fill(params.cssSelector, params.value, timeout=timeout_ms)
 
-            msg = f'⌨️  Input "{params.text}" into element with CSS selector: {params.selector}'
+            msg = f'⌨️  Input "{params.value}" into element with CSS selector: {params.cssSelector}'
             logger.info(msg)
             return ActionResult(extracted_content=msg, include_in_memory=True)
 
@@ -87,14 +87,14 @@ class WorkflowController(Controller):
         async def select_change(
             params: SelectDropdownOptionDeterministicAction, browser: BrowserContext
         ) -> ActionResult:
-            """Select dropdown option whose visible text equals *params.text*."""
+            """Select dropdown option whose visible text equals *params.value*."""
             timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
-            print(f"Selecting option in dropdown with selector: {params.selector}")
+            print(f"Selecting option in dropdown with selector: {params.cssSelector}")
             await page.select_option(
-                params.selector, label=params.text, timeout=timeout_ms
+                params.cssSelector, label=params.selectedText, timeout=timeout_ms
             )
-            msg = f'Selected option "{params.text}" in dropdown {params.selector}'
+            msg = f'Selected option "{params.selectedText}" in dropdown {params.cssSelector}'
             logger.info(msg)
             return ActionResult(extracted_content=msg, include_in_memory=True)
 
@@ -105,14 +105,14 @@ class WorkflowController(Controller):
         async def key_press(
             params: KeyPressDeterministicAction, browser: BrowserContext
         ) -> ActionResult:
-            """Press *params.key* on the element identified by *params.selector*."""
+            """Press *params.key* on the element identified by *params.cssSelector*."""
             timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
             print(
-                f"Pressing key '{params.key}' on element with selector: {params.selector}"
+                f"Pressing key '{params.key}' on element with selector: {params.cssSelector}"
             )
-            await page.press(params.selector, params.key, timeout=timeout_ms)
-            msg = f"🔑  Pressed key '{params.key}' on element with CSS selector: {params.selector}"
+            await page.press(params.cssSelector, params.key, timeout=timeout_ms)
+            msg = f"🔑  Pressed key '{params.key}' on element with CSS selector: {params.cssSelector}"
             logger.info(msg)
             return ActionResult(extracted_content=msg, include_in_memory=True)
 
