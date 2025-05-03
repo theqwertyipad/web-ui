@@ -235,13 +235,12 @@
   });
   refreshBtn.onclick = () => {
     window.notifyPython?.('control', { action: 'update' });
-    printToOutput('🔄 Requested state update');
   };
   refreshBtn.style.flex = '1';
   buttonRow.appendChild(refreshBtn);
 
   const closeBtn = document.createElement('button');
-  closeBtn.innerText = '❌ Close Recorder';
+  closeBtn.innerText = 'Close';
   Object.assign(closeBtn.style, {
     marginTop: '10px',
     background: '#dc3545',
@@ -255,10 +254,10 @@
   closeBtn.onclick = () => {
     window.notifyPython?.('control', { action: 'close' });
     let countdown = 3;
-    closeBtn.innerText = `❌ Close Recorder (${countdown})`;
+    closeBtn.innerText = `Close (${countdown})`;
     const intervalId = setInterval(() => {
       countdown -= 1;
-      closeBtn.innerText = `❌ Close Recorder (${countdown})`;
+      closeBtn.innerText = `Close (${countdown})`;
       if (countdown === 0) {
         clearInterval(intervalId);
         overlay.remove();
@@ -326,7 +325,6 @@
     const newState = !isRecording();
     setRecordingState(newState);
     window.notifyPython?.('control', { action: newState ? 'start' : 'finish' });
-    printToOutput(newState ? '▶️ Recording started' : '⏹️ Recording stopped');
     if (!newState) {
       // Clear the history list when recording is stopped
       while (historyList.firstChild) {
