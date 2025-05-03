@@ -252,6 +252,16 @@
   });
 
   closeBtn.onclick = () => {
+    // Remove event listeners
+    document.removeEventListener('keydown', keydownHandler);
+    document.keydownHandlerAttached = false;
+    document.removeEventListener('click', clickHandler);
+    document.clickHandlerAttached = false;
+    window.removeEventListener('popstate', popstateHandler);
+    window.popstateHandlerAttached = false;
+    window.removeEventListener('load', loadHandler);
+    window.loadHandlerAttached = false;
+
     window.notifyPython?.('control', { action: 'close' });
     let countdown = 3;
     closeBtn.innerText = `Close (${countdown})`;
@@ -413,7 +423,6 @@
 
   const keydownHandler = (e) => {
     console.log('keydown event triggered');
-    if (!isRecording) return;
 
     if (e.key.length === 1) {
       currentTypedText += e.key;
@@ -432,7 +441,6 @@
 
   const clickHandler = (event) => {
     console.log('click event triggered');
-    if (!isRecording) return;
 
     // Check if the click is on the recorder UI
     if (overlay.contains(event.target)) return;
@@ -456,13 +464,11 @@
 
   const popstateHandler = () => {
     console.log('popstate event triggered');
-    if (!isRecording) return;
     window.notifyPython?.('navigate', { url: window.location.href });
   };
 
   const loadHandler = () => {
     console.log('load event triggered');
-    if (!isRecording) return;
     window.notifyPython?.('navigate', { url: window.location.href });
   };
 

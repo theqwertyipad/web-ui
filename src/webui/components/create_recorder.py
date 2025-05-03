@@ -3,13 +3,12 @@ from gradio.components import Component
 import asyncio
 
 from src.webui.webui_manager import WebuiManager
-from src.utils import config
 from src.recorder.recorder import WorkflowRecorder
 
 
 def create_recorder(webui_manager: WebuiManager):
     """
-    Creates a load and save config tab.
+    Creates a recorder instance
     """
     input_components = set(webui_manager.get_components())
     tab_components = {}
@@ -25,17 +24,18 @@ def create_recorder(webui_manager: WebuiManager):
     webui_manager.add_components("create_recorder", tab_components)
 
     async def run_recorder_with_url(url):
+        url = url.strip()
         if not url:
-            url = 'https://www.browser-use.com/' # Add error handling
-        if not url.startswith('http://www.') and not url.startswith('https://www.'):
+            url = 'https://www.browser-use.com/'
+        elif not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-        await WorkflowRecorder().record_workflow(url)
-
-    def run_recorder_with_url_sync(url):
-        asyncio.run(run_recorder_with_url(url))
+        try:
+            await WorkflowRecorder().record_workflow(url)
+        except Exception as e:
+            print(f"An error occurred while recording the workflow: {e}")
 
     run_recorder.click(
-        fn=run_recorder_with_url_sync,
+        fn=run_recorder_with_url,
         inputs=[url_input],
         outputs=[]
     )

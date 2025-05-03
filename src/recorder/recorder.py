@@ -331,9 +331,9 @@ class WorkflowRecorder:
 		if self._workflow_saved:
 			print('Workflow already saved, skipping.')
 			return
-		# Check if there are no steps
-		if not self.steps:
-			print('No steps to save, skipping workflow save.')
+		# Check if there are no steps or only one step with 'navigate' action_type
+		if not self.steps or (len(self.steps) == 1 and self.steps[0].action_type == 'navigate'):
+			print('No meaningful steps to save, skipping workflow save.')
 			self._workflow_saved = True
 			return
 		try:
