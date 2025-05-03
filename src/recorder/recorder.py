@@ -39,20 +39,16 @@ class WorkflowRecorder:
 
 	async def update_state(self, context, page):
 		await page.evaluate('AgentRecorder.refreshListeners()')
-		try:
-			await page.expose_function('notifyPython', self._notify_python)
-			print('[🔗] Re-exposed notifyPython')
-		except Exception as expose_err:
-			print(f'[⚠️] Could not re-expose notifyPython: {expose_err}')
+		await self.expose_notify_python(page)
 
 	async def set_recording_state(self, page, state: bool):
 		self.recording = state
 		await page.evaluate('AgentRecorder.setRecording', state)
 		self._active_input = None
 
-	async def ensure_overlay_ready(self, page):
+	async def ensure_overlay_ready(self, page, timeout=2000):
 		try:
-			await page.wait_for_selector('#agent-recorder-ui', timeout=2000)
+			await page.wait_for_selector('#agent-recorder-ui', timeout=timeout)
 		except Exception as e:
 			await page.evaluate(self.js_overlay, self.recording)
 			await page.evaluate('AgentRecorder.setRecording', self.recording)
@@ -87,6 +83,24 @@ class WorkflowRecorder:
 		except asyncio.CancelledError:
 			return ''
 
+	async def expose_notify_python(self, page, max_attempts=2, delay=0.2):
+		"""Attempt to expose the notifyPython function with retries."""
+		for attempt in range(max_attempts):
+			try:
+				await page.expose_function('notifyPython', self._notify_python)
+				print(f'[🔗] notifyPython exposed on attempt {attempt + 1}')
+				# Mock evaluation to check if the function is exposed
+				is_exposed = await page.evaluate('typeof window.notifyPython === "function"')
+				if is_exposed:
+					print('[✅] notifyPython is callable from the page')
+					return
+				else:
+					print('[⚠️] notifyPython is not callable, retrying...')
+			except Exception as expose_err:
+				print(f'[⚠️] Attempt {attempt + 1} failed: {expose_err}')
+			await asyncio.sleep(delay)
+		print('[❌] Failed to expose notifyPython after maximum attempts')
+
 	async def record_workflow(self, url: str):
 		"""Record a workflow by following user clicks and keyboard input"""
 		browser = Browser(
@@ -119,12 +133,8 @@ class WorkflowRecorder:
 				# Restore recording state
 				await page.evaluate('(state) => AgentRecorder.setRecording(state)', self.recording)
 				
-				# Re-expose notifyPython function
-				try:
-					await page.expose_function('notifyPython', self._notify_python)
-					print('[🔗] Re-exposed notifyPython')
-				except Exception as expose_err:
-					print(f'[⚠️] Could not re-expose notifyPython: {expose_err}')
+				# Re-expose notifyPython function with retry
+				await self.expose_notify_python(page)
 				
 				for msg in self._overlay_logs:
 					await page.evaluate('(msg) => AgentRecorder.requestOutput(msg)', msg)
