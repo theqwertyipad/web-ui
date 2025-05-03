@@ -14,7 +14,7 @@ def create_recorder(webui_manager: WebuiManager):
     input_components = set(webui_manager.get_components())
     tab_components = {}
     with gr.Column():
-        url_input = gr.Textbox(label="Website URL to Record", placeholder="example.com")
+        url_input = gr.Textbox(label="Website URL to Record (default to browser-use.com)", placeholder="example.com")
         run_recorder = gr.Button("Run recorder", variant="primary")
 
     tab_components.update(dict(
@@ -26,8 +26,8 @@ def create_recorder(webui_manager: WebuiManager):
 
     async def run_recorder_with_url(url):
         if not url:
-            url = 'current_url'
-        if not url.startswith('http://www.') and not url.startswith('https://www.') and url != 'current_url':
+            url = 'https://www.browser-use.com/' # Add error handling
+        if not url.startswith('http://www.') and not url.startswith('https://www.'):
             url = 'https://' + url
         await WorkflowRecorder().record_workflow(url)
 

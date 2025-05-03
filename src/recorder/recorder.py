@@ -30,7 +30,6 @@ class WorkflowRecorder:
 		self.js_overlay = resources.read_text('src.recorder', 'gui.js')
 		self._overlay_logs: List[str] = []
 		self._active_input: Optional[dict] = None
-		self.has_navigated = False
 		self._validated_elements = {}
 		self._recording_complete = asyncio.Event()
 		self._should_exit = False
@@ -148,16 +147,13 @@ class WorkflowRecorder:
 			page.on('load', handle_page_load)
 
 			await asyncio.sleep(1)
-			if not self.has_navigated:
-				self.has_navigated = True
-				await self.overlay_print(f'Navigating to {url}...', page)
-				try:
-					await page.goto(url, wait_until='domcontentloaded', timeout=10000)
-					# Let patchright load
-					await asyncio.sleep(2)
-				except Exception as e:
-					await self.overlay_print(f'Error navigating to {url}: {str(e)}', page)
-					return
+			await self.overlay_print(f'Navigating to {url}...', page)
+			try:
+				await page.goto(url, wait_until='domcontentloaded', timeout=10000)
+				print('Page loaded!')
+			except Exception as e:
+				await self.overlay_print(f'Error navigating to {url}: {str(e)}', page)
+				return
 
 			async def notify_python(event_type, payload):
 				page = await context.get_current_page()
