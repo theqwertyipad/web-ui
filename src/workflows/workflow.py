@@ -23,8 +23,6 @@ from .controller.service import WorkflowController
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DETERMINISTIC_TIMEOUT = 20  # seconds
-
 FALLBACK_PROMPT = (
 	'While executing step {step_index}/{total_steps} in the workflow:\n\n{workflow_details}\n\n'
 	'The deterministic action failed with the following context:\n{fail_details}\n\n'
@@ -93,25 +91,19 @@ class Workflow:
 		return steps, inputs_def
 
 	async def _run_deterministic_step(self, step: Dict[str, Any]) -> ActionResult:
-		"""Execute a deterministic (controller) action with an optional timeout."""
+		"""Execute a deterministic (controller) action."""
 		action_name: str = step['action']
 		params: Dict[str, Any] = step.get('params', {})
-		timeout: float = step.get('timeout', DEFAULT_DETERMINISTIC_TIMEOUT)
 
 		ActionModel = self.controller.registry.create_action_model(include_actions=[action_name])
 		action_model = ActionModel(**{action_name: params})
 
 		try:
-			# Create a task for the controller action
-			action_task = self.controller.act(action_model, self.browser_context)
+			# Execute the controller action
+			return await self.controller.act(action_model, self.browser_context)
 			
-			# Wait for either completion or timeout
-			return await asyncio.wait_for(action_task, timeout=timeout)
-			
-		except asyncio.TimeoutError:
-			raise TimeoutError(f"Deterministic action '{action_name}' exceeded the timeout of {timeout} s")
 		except Exception as e:
-			# Catch any other errors from the controller action
+			# Catch any errors from the controller action
 			raise RuntimeError(f"Deterministic action '{action_name}' failed: {str(e)}")
 
 	async def _run_agent_step(self, step: Dict[str, Any]) -> AgentHistoryList | dict[str, Any]:

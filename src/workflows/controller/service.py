@@ -23,8 +23,10 @@ class WorkflowController(Controller):
 		@self.registry.action('Click element by CSS selector', param_model=ClickElementByCssSelectorAction)
 		async def click_element_by_css_selector(params: ClickElementByCssSelectorAction, browser: BrowserContext) -> ActionResult:
 			"""Click the first element matching *params.selector*."""
+			timeout_ms = 5000  # 5 seconds
 			page = await browser.get_current_page()
-			await page.click(params.selector)
+			print(f"Clicking element with selector: {params.selector}")
+			await page.click(params.selector, timeout=timeout_ms)
 			msg = f'🖱️  Clicked element with CSS selector: {params.selector}'
 			logger.info(msg)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
@@ -35,9 +37,10 @@ class WorkflowController(Controller):
 			params: InputTextActionCssSelector, browser: BrowserContext, has_sensitive_data: bool = False
 		) -> ActionResult:
 			"""Fill text into the element located with *params.selector*."""
+			timeout_ms = 5000  # 5 seconds
 			page = await browser.get_current_page()
-			handle = page.locator(f'css={params.selector}').first
-			await handle.fill(params.text)
+			print(f"Filling text into element with selector: {params.selector}")
+			await page.fill(params.selector, params.text, timeout=timeout_ms)
 			msg = f'⌨️  Input "{params.text}" into element with CSS selector: {params.selector}'
 			logger.info(msg)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
@@ -51,13 +54,10 @@ class WorkflowController(Controller):
 			params: SelectDropdownOptionBySelectorAndText, browser: BrowserContext
 		) -> ActionResult:
 			"""Select dropdown option whose visible text equals *params.text*."""
+			timeout_ms = 5000  # 5 seconds
 			page = await browser.get_current_page()
-			handle = await page.query_selector(params.selector)
-			if handle:
-				result = await handle.select_option(label=params.text)
-				msg = f'Selected option "{params.text}" (value={result}) in dropdown {params.selector}'
-				logger.info(msg)
-				return ActionResult(extracted_content=msg, include_in_memory=True)
-
-			msg = f'Cannot select option: Element with selector {params.selector} not found'
+			print(f"Selecting option in dropdown with selector: {params.selector}")
+			await page.select_option(params.selector, label=params.text, timeout=timeout_ms)
+			msg = f'Selected option "{params.text}" in dropdown {params.selector}'
+			logger.info(msg)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
