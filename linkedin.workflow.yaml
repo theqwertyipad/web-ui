@@ -1,0 +1,66 @@
+```json
+{
+  "name": "Automated LinkedIn Messaging",
+  "description": "A workflow to send messages automatically on LinkedIn.",
+  "events": [
+    {
+      "type": "navigation",
+      "url": "https://github.com/mcp-use/mcp-use"
+    },
+    {
+      "type": "navigation",
+      "url": "https://ogs.google.com/u/0/widget/app?eom=1&awwd=1&origin=chrome-untrusted%3A%2F%2Fnew-tab-page&origin=chrome%3A%2F%2Fnew-tab-page&cn=app&pid=1&spid=243&hl=en&dm="
+    },
+    {
+      "type": "navigation",
+      "url": "https://www.linkedin.com/"
+    },
+    {
+      "type": "navigation",
+      "url": "https://www.linkedin.com/feed/"
+    },
+    {
+      "type": "navigation",
+      "url": "https://www.linkedin.com/tscp-serving/dtag?sz=300x250&ti=1&p=1&c=1&z=home&pk=d_flagship3_feed&pz=BR&lix=voyager.web.right-rail-ad-viewability-tracking%3Acontrol"
+    },
+    {
+      "type": "navigation",
+      "url": "https://lnkd.demdex.net/dest5.html?d_nsid=0#https%3A%2F%2Fwww.linkedin.com"
+    },
+    {
+      "type": "navigation",
+      "url": "https://www.googletagmanager.com/static/service_worker/5510/sw_iframe.html?origin=https%3A%2F%2Fwww.linkedin.com"
+    },
+    {
+      "type": "navigation",
+      "url": "https://www.linkedin.com/feed/"
+    },
+    {
+      "type": "click",
+      "cssSelector": "path"
+    },
+    {
+      "type": "navigation",
+      "url": "https://www.linkedin.com/messaging/thread/2-Y2E5YTI2ODgtZWQxMi00YThiLThjNDctMDQxOTU1N2RhNTMyXzAxMg==/"
+    },
+    {
+      "type": "input",
+      "cssSelector": "input.ember-text-field.ember-view.msg-cross-pillar-search-form__search-field.t-14.t-black.t-normal[id=\"search-conversations\"][name=\"searchTerm\"][placeholder*=\"Search messages\"][autocomplete=\"off\"][type=\"search\"]",
+      "value": "alberto carpentieri"
+    },
+    {
+      "type": "key_press",
+      "key": "Enter"
+    },
+    {
+      "type": "click",
+      "cssSelector": "button.msg-form__send-button.artdeco-button.artdeco-button--1[type=\"submit\"]"
+    },
+    {
+      "type": "done",
+      "text": "Message sent successfully.",
+      "success": true
+    }
+  ]
+}
+```

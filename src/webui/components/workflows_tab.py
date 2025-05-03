@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import gradio as gr
-import yaml
 from browser_use.browser.browser import Browser, BrowserConfig
 from gradio.components import Component
 
@@ -22,7 +21,7 @@ WORKFLOW_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 def _list_saved_workflows() -> list[str]:
     """Return a sorted list of saved workflow filenames (relative)."""
-    return sorted([p.name for p in WORKFLOW_STORAGE_DIR.glob("*.y*ml")])
+    return sorted([p.name for p in WORKFLOW_STORAGE_DIR.glob("*.json")])
 
 
 def create_workflows_tab(webui_manager: WebuiManager):
@@ -90,13 +89,13 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 interactive=False,
             )
 
-            generated_yaml = gr.Code(
-                language="yaml", label="Generated Workflow YAML", interactive=False
+            generated_json = gr.Code(
+                language="json", label="Generated Workflow JSON", interactive=False
             )
 
             # --- Display parsed input schema ---
             generated_workflow_schema = gr.Code(
-                language="json", label="Input Schema (from YAML)", interactive=False
+                language="json", label="Input Schema (from Workflow)", interactive=False
             )
 
             # Add save instructions
@@ -109,8 +108,8 @@ def create_workflows_tab(webui_manager: WebuiManager):
             # --- Save generated workflow UI ---
             with gr.Row():
                 generated_filename_tb = gr.Textbox(
-                    label="Save As Filename (.yaml)",
-                    placeholder="my_workflow.yaml",
+                    label="Save As Filename (.json)",
+                    placeholder="my_workflow.json",
                     lines=1,
                     interactive=True,
                 )
@@ -181,14 +180,14 @@ def create_workflows_tab(webui_manager: WebuiManager):
             
             **Option 1:** Select from your saved workflows in the dropdown below
             
-            **Option 2:** Upload a workflow YAML file
+            **Option 2:** Upload a workflow JSON file
             """)
 
             with gr.Group():
                 with gr.Row():
                     workflow_file = gr.File(
-                        label="Workflow YAML",
-                        file_types=[".yaml", ".yml"],
+                        label="Workflow JSON",
+                        file_types=[".json"],
                         interactive=True,
                         elem_id="uploaded_workflow_file",
                     )
@@ -203,10 +202,12 @@ def create_workflows_tab(webui_manager: WebuiManager):
                     refresh_saved_button = gr.Button("🔄 Refresh", variant="secondary")
 
             # Display the uploaded workflow
-            upload_yaml = gr.Code(language="yaml", label="Workflow", interactive=False)
+            upload_workflow = gr.Code(
+                language="json", label="Workflow", interactive=False
+            )
 
             # --- Display parsed input schema ---
-            uploaded_yaml_schema = gr.Code(
+            uploaded_json_schema = gr.Code(
                 language="json", label="Input Schema ", interactive=False
             )
 
@@ -265,7 +266,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
             generate_button=generate_button,
             generated_filename_tb=generated_filename_tb,
             save_generated_button=save_generated_button,
-            generated_yaml=generated_yaml,
+            generated_json=generated_json,
             generated_save_status=generated_save_status,
             generated_workflow_inputs_json=generated_workflow_inputs_json,
             # Run
@@ -280,8 +281,8 @@ def create_workflows_tab(webui_manager: WebuiManager):
             generated_run_tool_button=generated_run_tool_button,
             generate_status_output=generate_status_output,
             # Uploaded
-            upload_yaml=upload_yaml,
-            uploaded_yaml_schema=uploaded_yaml_schema,
+            upload_workflow=upload_workflow,
+            uploaded_json_schema=uploaded_json_schema,
             uploaded_workflow_inputs_json=uploaded_workflow_inputs_json,
             uploaded_tool_input=uploaded_tool_input,
             run_uploaded_button=run_uploaded_button,
@@ -296,13 +297,13 @@ def create_workflows_tab(webui_manager: WebuiManager):
     # ------------------------------------------------------------------
 
     def _sanitize_filename(name: str) -> Optional[str]:
-        """Return sanitized filename ensuring `.yaml` extension or None if invalid."""
+        """Return sanitized filename ensuring `.json` extension or None if invalid."""
         if not name:
             return None
         name = name.strip()
         # Default extension
-        if not name.lower().endswith((".yaml", ".yml")):
-            name += ".yaml"
+        if not name.lower().endswith((".json",)):
+            name += ".json"
 
         # Prevent directory traversal
         if any(part in ("..", "/") for part in name.split(os.sep)):
@@ -335,21 +336,19 @@ def create_workflows_tab(webui_manager: WebuiManager):
             print(f"Failed to initialize LLM: {e}")
             return None
 
-    def _extract_schema(yaml_text: Optional[str]) -> str:
-        """Extract and format input schema from YAML content."""
-        if not yaml_text or not yaml_text.strip():
+    def _extract_schema(workflow_text: Optional[str]) -> str:
+        """Extract and pretty-print the `inputs` schema from a workflow JSON string."""
+        if not workflow_text or not workflow_text.strip():
             return "{}"
         try:
-            data = yaml.safe_load(yaml_text)
-            if not data:
-                return "{}"
-            schema = data.get("inputs", {})
+            data = json.loads(workflow_text)
+            schema = data.get("inputs", {}) if data else {}
             return json.dumps(schema, indent=2)
         except Exception:
             return "{}"
 
-    def _load_yaml_file(file_obj):
-        """Load YAML file content from uploaded file or path string."""
+    def _load_workflow_file(file_obj):
+        """Load workflow JSON file content from uploaded file or path string."""
         if file_obj is None:
             return None, None
 
@@ -364,11 +363,11 @@ def create_workflows_tab(webui_manager: WebuiManager):
             return None, None
 
         try:
-            yaml_content = file_path.read_text(encoding="utf-8")
-            schema_text = _extract_schema(yaml_content)
-            return yaml_content, schema_text
+            workflow_content = file_path.read_text(encoding="utf-8")
+            schema_text = _extract_schema(workflow_content)
+            return workflow_content, schema_text
         except Exception as e:
-            print(f"Error loading YAML file {file_path}: {e}")
+            print(f"Error loading workflow file {file_path}: {e}")
             return None, None
 
     def _get_agent_settings(components_dict):
@@ -396,17 +395,17 @@ def create_workflows_tab(webui_manager: WebuiManager):
             "use_screenshots": use_screenshots,
         }
 
-    def _resolve_yaml_path(yaml_file) -> Optional[Path]:
-        """Resolve YAML file path, checking if it exists in WORKFLOW_STORAGE_DIR."""
-        if yaml_file is None:
+    def _resolve_workflow_path(wf_file) -> Optional[Path]:
+        """Resolve workflow JSON path, checking saved directory as fallback."""
+        if wf_file is None:
             return None
 
-        yaml_path = Path(getattr(yaml_file, "name", str(yaml_file)))
-        if yaml_path.exists():
-            return yaml_path
+        wf_path = Path(getattr(wf_file, "name", str(wf_file)))
+        if wf_path.exists():
+            return wf_path
 
-        # Check if it's a relative path within WORKFLOW_STORAGE_DIR
-        potential_path = WORKFLOW_STORAGE_DIR / yaml_path.name
+        # Fallback to saved directory
+        potential_path = WORKFLOW_STORAGE_DIR / wf_path.name
         if potential_path.exists():
             return potential_path
 
@@ -417,7 +416,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
     # ------------------------------------------------------------------
 
     async def _generate_workflow(components: Dict[Component, Any]):
-        """Generate YAML workflow from a simplified session JSON + goal."""
+        """Generate JSON workflow from a simplified session JSON + goal."""
         session_file_obj = components.get(session_json_file)
         session_path_str = None
 
@@ -431,7 +430,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 generate_status_output: gr.update(
                     value="⚠️ Please upload a session JSON file."
                 ),
-                generated_yaml: gr.update(value=""),
+                generated_json: gr.update(value=""),
                 generated_workflow_schema: gr.update(value="{}"),
             }
 
@@ -451,7 +450,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 generate_status_output: gr.update(
                     value="❌ Failed to initialize LLM. Check Agent Settings."
                 ),
-                generated_yaml: gr.update(value=""),
+                generated_json: gr.update(value=""),
                 generated_workflow_schema: gr.update(value="{}"),
             }
 
@@ -462,17 +461,17 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 llm=llm,
                 use_screenshots=settings["use_screenshots"],
             )
-            yaml_path = Path(workflow_obj.yaml_path)
-            yaml_content = yaml_path.read_text(encoding="utf-8")
+            wf_path = Path(workflow_obj.json_path)
+            workflow_text = wf_path.read_text(encoding="utf-8")
 
             # Extract schema
-            schema_text = _extract_schema(yaml_content)
+            schema_text = _extract_schema(workflow_text)
 
             return {
                 generate_status_output: gr.update(
                     value="✅ WORKFLOW GENERATION COMPLETED ✅"
                 ),
-                generated_yaml: gr.update(value=yaml_content),
+                generated_json: gr.update(value=workflow_text),
                 generated_workflow_schema: gr.update(value=schema_text),
             }
         except Exception as e:
@@ -481,22 +480,22 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 generate_status_output: gr.update(
                     value=f"❌ Error generating workflow: {e}\n\n{tb}"
                 ),
-                generated_yaml: gr.update(value=""),
+                generated_json: gr.update(value=""),
                 generated_workflow_schema: gr.update(value="{}"),
             }
 
-    async def _execute_workflow_from_json(yaml_file: Any, inputs_json: Optional[str]):
+    async def _execute_workflow(wf_file: Any, inputs_json: Optional[str]):
         """Execute the workflow using JSON inputs."""
-        # Validate YAML file
-        if yaml_file is None:
+        # Validate workflow file
+        if wf_file is None:
             return gr.update(
-                value="⚠️ Please upload/select a workflow YAML file before running."
+                value="⚠️ Please upload/select a workflow JSON file before running."
             )
 
-        yaml_path = _resolve_yaml_path(yaml_file)
-        if yaml_path is None:
+        wf_path = _resolve_workflow_path(wf_file)
+        if wf_path is None:
             return gr.update(
-                value=f"⚠️ YAML file not found: {getattr(yaml_file, 'name', str(yaml_file))}"
+                value=f"⚠️ JSON file not found: {getattr(wf_file, 'name', str(wf_file))}"
             )
 
         # Parse optional JSON inputs
@@ -516,7 +515,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 headless=False,
             )
             browser = Browser(config=config)
-            workflow = Workflow(yaml_path=str(yaml_path), browser=browser)
+            workflow = Workflow(json_path=str(wf_path), browser=browser)
             results = await workflow.run_async(inputs=inputs_dict or None)
             pretty = json.dumps(results, indent=2, ensure_ascii=False)
             return gr.update(value=f"✅ Workflow finished successfully\n\n{pretty}")
@@ -525,17 +524,17 @@ def create_workflows_tab(webui_manager: WebuiManager):
             return gr.update(value=f"❌ Error running workflow: {e}\n\n{tb}")
 
     async def _execute_workflow_as_tool(
-        yaml_path: Path, nl_input: Optional[str], llm: Any, output_component: Component
+        wf_path: Path, nl_input: Optional[str], llm: Any, output_component: Component
     ):
         """
         Core function to execute a workflow as a tool.
         Returns a dictionary with the output component as the key.
         """
         # Validate inputs
-        if yaml_path is None:
+        if wf_path is None:
             return {
                 output_component: gr.update(
-                    value="⚠️ Please upload/select a workflow YAML file before running as tool."
+                    value="⚠️ Please upload/select a workflow JSON file before running as tool."
                 )
             }
 
@@ -563,7 +562,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 headless=False,
             )
             browser = Browser(config=config)
-            workflow = Workflow(yaml_path=str(yaml_path), llm=llm, browser=browser)
+            workflow = Workflow(json_path=str(wf_path), llm=llm, browser=browser)
             result = await workflow.run_as_tool(nl_input_str)
             return {
                 output_component: gr.update(value=f"✅ Tool run completed:\n\n{result}")
@@ -581,13 +580,13 @@ def create_workflows_tab(webui_manager: WebuiManager):
     # ------------------------------------------------------------------
 
     async def _run_generated_workflow_as_tool(components_dict: Dict[Component, Any]):
-        """Run workflow as a tool from generated YAML."""
-        yaml_text = components_dict.get(generated_yaml)
+        """Run workflow as a tool from generated JSON."""
+        wf_text = components_dict.get(generated_json)
         nl_input = components_dict.get(generated_tool_input)
 
-        if not yaml_text or not yaml_text.strip():
+        if not wf_text or not wf_text.strip():
             return {
-                record_workflow_output: gr.update(value="⚠️ No workflow YAML available.")
+                record_workflow_output: gr.update(value="⚠️ No workflow JSON available.")
             }
 
         if not nl_input or not str(nl_input).strip():
@@ -618,10 +617,10 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 )
             }
 
-        # Write yaml to temporary file
-        tmp_path = WORKFLOW_STORAGE_DIR / f"_tmp_{uuid.uuid4().hex}.yaml"
+        # Write json to temporary file
+        tmp_path = WORKFLOW_STORAGE_DIR / f"_tmp_{uuid.uuid4().hex}.json"
         try:
-            tmp_path.write_text(yaml_text, encoding="utf-8")
+            tmp_path.write_text(wf_text, encoding="utf-8")
             return await _execute_workflow_as_tool(
                 tmp_path, nl_input_str, llm, record_workflow_output
             )
@@ -641,15 +640,15 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
     async def _run_uploaded_workflow_as_tool(components_dict: Dict[Component, Any]):
         """Run an uploaded workflow as a tool."""
-        yaml_file = components_dict.get(workflow_file)
+        wf_file = components_dict.get(workflow_file)
         nl_input = components_dict.get(uploaded_tool_input)
 
-        # Resolve YAML path
-        yaml_path = _resolve_yaml_path(yaml_file)
-        if yaml_path is None:
+        # Resolve JSON path
+        wf_path = _resolve_workflow_path(wf_file)
+        if wf_path is None:
             return {
                 upload_workflow_output: gr.update(
-                    value=f"⚠️ YAML file not found: {getattr(yaml_file, 'name', str(yaml_file))}"
+                    value=f"⚠️ JSON file not found: {getattr(wf_file, 'name', str(wf_file))}"
                 )
             }
 
@@ -683,16 +682,16 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
         # Execute workflow
         return await _execute_workflow_as_tool(
-            yaml_path, nl_input_str, llm, upload_workflow_output
+            wf_path, nl_input_str, llm, upload_workflow_output
         )
 
     # ------------------------------------------------------------------
     # Persistence functions
     # ------------------------------------------------------------------
 
-    def _save_generated_workflow(yaml_content: Optional[str], filename: Optional[str]):
-        """Save generated YAML content to storage directory."""
-        if not yaml_content or not yaml_content.strip():
+    def _save_generated_workflow(wf_content: Optional[str], filename: Optional[str]):
+        """Save generated workflow JSON content to storage directory."""
+        if not wf_content or not wf_content.strip():
             return {
                 generated_save_status: gr.update(
                     value="⚠️ No workflow generated to save."
@@ -709,7 +708,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
         save_path = WORKFLOW_STORAGE_DIR / sanitized
         try:
-            save_path.write_text(yaml_content, encoding="utf-8")
+            save_path.write_text(wf_content, encoding="utf-8")
             status_msg = f"✅ Saved workflow to {save_path}"
         except Exception as e:
             status_msg = f"❌ Failed to save workflow: {e}"
@@ -725,18 +724,18 @@ def create_workflows_tab(webui_manager: WebuiManager):
         """Refresh list of saved workflows for dropdown."""
         return gr.update(choices=_list_saved_workflows())
 
-    async def _run_yaml_text(yaml_text: Optional[str], inputs_json: Optional[str]):
-        """Run a workflow from YAML text content using JSON inputs."""
-        if not yaml_text or not yaml_text.strip():
-            return gr.update(value="⚠️ No workflow YAML available.")
+    async def _run_json_text(json_text: Optional[str], inputs_json: Optional[str]):
+        """Run a workflow from JSON text content using JSON inputs."""
+        if not json_text or not json_text.strip():
+            return gr.update(value="⚠️ No workflow JSON available.")
 
         # Write to temporary file
-        tmp_path = WORKFLOW_STORAGE_DIR / f"_tmp_{uuid.uuid4().hex}.yaml"
+        tmp_path = WORKFLOW_STORAGE_DIR / f"_tmp_{uuid.uuid4().hex}.json"
         try:
-            tmp_path.write_text(yaml_text, encoding="utf-8")
-            return await _execute_workflow_from_json(str(tmp_path), inputs_json)
+            tmp_path.write_text(json_text, encoding="utf-8")
+            return await _execute_workflow(str(tmp_path), inputs_json)
         except Exception as e:
-            return gr.update(value=f"❌ Error processing workflow YAML: {e}")
+            return gr.update(value=f"❌ Error processing workflow JSON: {e}")
         finally:
             # Clean up temp file
             if tmp_path.exists():
@@ -762,17 +761,17 @@ def create_workflows_tab(webui_manager: WebuiManager):
         """Show that workflow is running."""
         return gr.update(value="⏳ RUNNING WORKFLOW... PLEASE WAIT ⏳")
 
-    def update_yaml_display(file_obj):
-        """Update the YAML display when a file is uploaded or selected."""
-        yaml_content, schema_text = _load_yaml_file(file_obj)
-        if yaml_content:
+    def update_json_display(file_obj):
+        """Update the JSON display when a file is uploaded or selected."""
+        wf_content, schema_text = _load_workflow_file(file_obj)
+        if wf_content:
             return {
-                upload_yaml: gr.update(value=yaml_content),
-                uploaded_yaml_schema: gr.update(value=schema_text),
+                upload_workflow: gr.update(value=wf_content),
+                uploaded_json_schema: gr.update(value=schema_text),
             }
         return {
-            upload_yaml: gr.update(value=""),
-            uploaded_yaml_schema: gr.update(value="{}"),
+            upload_workflow: gr.update(value=""),
+            uploaded_json_schema: gr.update(value="{}"),
         }
 
     # ------------------------------------------------------------------
@@ -783,12 +782,12 @@ def create_workflows_tab(webui_manager: WebuiManager):
     generate_button.click(
         fn=show_generating_status,
         inputs=None,
-        outputs=[generate_status_output, generated_yaml, generated_workflow_schema],
+        outputs=[generate_status_output, generated_json, generated_workflow_schema],
         queue=False,
     ).then(
         fn=_generate_workflow,
         inputs=set(webui_manager.get_components()),
-        outputs=[generate_status_output, generated_yaml, generated_workflow_schema],
+        outputs=[generate_status_output, generated_json, generated_workflow_schema],
     )
 
     # Save generated workflow
@@ -799,7 +798,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         queue=False,
     ).then(
         fn=_save_generated_workflow,
-        inputs=[generated_yaml, generated_filename_tb],
+        inputs=[generated_json, generated_filename_tb],
         outputs=[generated_save_status, saved_workflows_dd],
     )
 
@@ -810,8 +809,8 @@ def create_workflows_tab(webui_manager: WebuiManager):
         outputs=record_workflow_output,
         queue=False,
     ).then(
-        fn=_run_yaml_text,
-        inputs=[generated_yaml, generated_workflow_inputs_json],
+        fn=_run_json_text,
+        inputs=[generated_json, generated_workflow_inputs_json],
         outputs=[record_workflow_output],
     )
 
@@ -838,11 +837,11 @@ def create_workflows_tab(webui_manager: WebuiManager):
         outputs=[saved_workflows_dd],
     )
 
-    # Update YAML display when file is uploaded
+    # Update JSON display when file is uploaded
     workflow_file.change(
-        fn=update_yaml_display,
+        fn=update_json_display,
         inputs=[workflow_file],
-        outputs=[upload_yaml, uploaded_yaml_schema],
+        outputs=[upload_workflow, uploaded_json_schema],
     )
 
     # Update workflow file when dropdown selection changes
@@ -859,7 +858,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         outputs=upload_workflow_output,
         queue=False,
     ).then(
-        fn=_execute_workflow_from_json,
+        fn=_execute_workflow,
         inputs=[workflow_file, uploaded_workflow_inputs_json],
         outputs=[upload_workflow_output],
     )
