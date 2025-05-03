@@ -156,11 +156,11 @@
 
   const recorderContent = document.createElement('div');
   recorderContent.id = 'recorder-content';
-  recorderContent.style.display = 'flex'; // Use flex to arrange content and buttons
-  recorderContent.style.gap = '10px'; // Space between main content and button column
+  recorderContent.style.display = 'flex';
+  recorderContent.style.gap = '10px';
 
   const mainContent = document.createElement('div');
-  mainContent.style.flex = '1'; // Main content takes remaining space
+  mainContent.style.flex = '1';
 
   const outputBox = document.createElement('div');
   outputBox.id = 'output-box';
@@ -173,7 +173,15 @@
     fontFamily: fontFamily,
     fontSize: '13px',
     overflowY: 'auto',
+    overflowX: 'auto',
     maxHeight: '120px',
+    boxSizing: 'border-box',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0',
   });
   mainContent.appendChild(outputBox);
 
@@ -266,21 +274,16 @@
   function setRecordingState(state) {
     recordingState = state;
 
-    // 🔁 Always show toggle button when not recording
     toggleBtn.style.display = 'inline-block';
     refreshBtn.style.display = state ? 'inline-block' : 'none';
     toggleBtn.textContent = state ? 'Stop' : 'Start';
     toggleBtn.style.background = state ? '#e53935' : '#4CAF50';
-
-    // if (state) {
-    //   attachListeners();
-    // }
   }
 
   function isRecording() {
     return recordingState;
   }
-  // Dragging logic
+
   let isDragging = false;
   let offsetX = 0,
     offsetY = 0;
@@ -336,19 +339,42 @@
     if (isNew) {
       const line = document.createElement('div');
       line.textContent = text;
+      Object.assign(line.style, {
+        background: '#2a2a2a',
+        padding: '3px 5px',
+        marginBottom: '8px',
+        borderRadius: '4px',
+        boxSizing: 'border-box',
+        width: '100%',
+        wordBreak: 'break-word',
+        fontSize: '13px',
+        color: '#fff',
+        border: '1px solid #3a3a3a',
+      });
       outputBox.appendChild(line);
     } else {
       const lastLine = outputBox.lastElementChild;
       if (lastLine) {
         lastLine.textContent += text;
       } else {
-        // If there's no existing line, create a new one
         const line = document.createElement('div');
         line.textContent = text;
+        Object.assign(line.style, {
+          background: '#2a2a2a',
+          padding: '3px 5px',
+          marginBottom: '8px',
+          borderRadius: '4px',
+          boxSizing: 'border-box',
+          width: '100%',
+          wordBreak: 'break-word',
+          fontSize: '13px',
+          color: '#fff',
+          border: '1px solid #3a3a3a',
+        });
         outputBox.appendChild(line);
       }
     }
-    outputBox.scrollTop = outputBox.scrollHeight;
+    outputBox.scrollTop = outputBox.scrollHeight; // Scroll to the latest line
   };
   const renderWorkflowStep = ({ step, action }) => {
     const container = document.createElement('div');
@@ -387,7 +413,6 @@
     historyList.appendChild(container);
   };
 
-  // Define the event handlers
   const keydownHandler = (e) => {
     console.log('keydown event triggered');
     if (!isRecording) return;
@@ -414,23 +439,20 @@
     // Check if the click is on the recorder UI
     if (overlay.contains(event.target)) return;
 
-    // If currentTypedText is not empty, send elementType event
     if (currentTypedText) {
       console.log('sending type-then-click');
       window.notifyPython?.('elementType', {
         text: currentTypedText,
         mode: 'type-then-click',
       });
-      currentTypedText = ''; // Clear the typed text after sending
+      currentTypedText = '';
     }
 
-    // Gather all attributes of the clicked element
     const attributes = {};
     for (let attr of event.target.attributes) {
       attributes[attr.name] = attr.value;
     }
 
-    // Send all attributes to notifyPython
     window.notifyPython?.('elementClick', { attributes });
   };
 
@@ -500,7 +522,7 @@
       }
     },
     requestOutput: (text) => {
-      printToOutput(text);
+      printToOutput({ text: text, isNew: true });
     },
     requestInput: ({ mode, question, placeholder = '', choices = [] }) => {
       inputLabel.innerText = question;
