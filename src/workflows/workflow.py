@@ -5,7 +5,7 @@ import json
 import json as _json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from browser_use.agent.service import Agent
 from browser_use.agent.views import ActionResult, AgentHistoryList
@@ -49,7 +49,6 @@ class Workflow:
             raise FileNotFoundError(self.json_path)
 
         self.controller = controller or WorkflowController()
-        logger.info(self.controller.registry.registry.actions)
         self.browser = browser or Browser()
         self.llm = llm
         self.fallback_to_agent = fallback_to_agent
@@ -79,8 +78,10 @@ class Workflow:
         else:
             events = raw
 
+        debounced_events = self._debounce_input_events(events) 
+
         steps: List[Dict[str, Any]] = []
-        for evt in events:
+        for evt in debounced_events:
             if evt.get("screenshot"):
                 evt["screenshot"] = ""
             steps.append(
@@ -558,3 +559,45 @@ class Workflow:
         agent_executor = AgentExecutor(agent=agent, tools=[workflow_tool])
         result = await agent_executor.ainvoke({"input": input})
         return result["output"]
+
+    # ------------------------------------------------------------------
+    # Event helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _debounce_input_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Collapse successive *input* events on the same element.
+
+        Many recorders emit a new *input* event on every keystroke so typing
+        "hello" becomes five events with values "h", "he", "hel", … We keep only
+        the *last* event of each consecutive run on the same element.
+        """
+        debounced: List[Dict[str, Any]] = []
+        pending_input: Optional[Dict[str, Any]] = None
+
+        def _flush_pending():
+            nonlocal pending_input
+            if pending_input is not None:
+                debounced.append(pending_input)
+                pending_input = None
+
+        for evt in events:
+            if evt.get("type") == "input":
+                selector_key = evt.get("cssSelector") or evt.get("xpath") or ""
+                if (
+                    pending_input
+                    and (pending_input.get("cssSelector") or pending_input.get("xpath"))
+                    == selector_key
+                ):
+                    # Same element – keep the newer (more complete) value
+                    pending_input = evt
+                else:
+                    # New element – flush previous and start new pending
+                    _flush_pending()
+                    pending_input = evt
+            else:
+                _flush_pending()
+                debounced.append(evt)
+
+        _flush_pending()
+        return debounced
