@@ -135,11 +135,7 @@ class WorkflowRecorder:
 					await page.evaluate('(data) => AgentRecorder.requestInput(data)', self._active_input)
 				# Restore steps in the side panel
 				for step in self.steps:
-					if step.action_type.startswith('type'):
-						action = 'Type text'
-					else:
-						action = f'{step.action_type.title()} on {step.clicked_element.get("tag_name", "element")}'
-					
+					action = step.action_type
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
 						action,
@@ -313,8 +309,6 @@ class WorkflowRecorder:
 						'action_type': step.action_type,
 						'clicked_element': {
 							**step.clicked_element,
-							'validator': step.clicked_element.get('validator'),
-							'validator_type': step.clicked_element.get('validator_type'),
 						},
 						'url': step.url,
 						'typed_text': step.typed_text,
