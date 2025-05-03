@@ -3,7 +3,7 @@ import os
 import traceback
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 import gradio as gr
 import yaml
@@ -44,6 +44,21 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # 1. GENERATE WORKFLOW TAB
         # ===============================================================
         with gr.TabItem("⏺️ Record"):
+            # Add instructions markdown
+            gr.Markdown("""
+            ### Recording a Workflow
+            
+            **Step 1:** Install the browser extension from the Agent Settings tab
+            
+            **Step 2:** Open a new tab and turn on recording (click the extension icon)
+            
+            **Step 3:** Complete the task you want to automate
+            
+            **Step 4:** Stop recording and download the session JSON file
+            
+            **Step 5:** Upload the JSON file below and describe what you want to achieve
+            """)
+
             with gr.Group():
                 with gr.Row():
                     session_json_file = gr.File(
@@ -74,6 +89,14 @@ def create_workflows_tab(webui_manager: WebuiManager):
             generated_workflow_schema = gr.Code(
                 language="json", label="Input Schema (from YAML)", interactive=False
             )
+
+            # Add save instructions
+            gr.Markdown("""
+            ### Saving Your Workflow
+            
+            Save your workflow with a descriptive name. Saved workflows will be available in the "Run Workflows" tab for future use.
+            """)
+
             # --- Save generated workflow UI ---
             with gr.Row():
                 generated_filename_tb = gr.Textbox(
@@ -90,6 +113,19 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 save_generated_button = gr.Button(
                     "💾 Save Workflow", variant="secondary"
                 )
+            
+            # Add run instructions for generated workflow
+            gr.Markdown("""
+            ### Testing Your Generated Workflow
+            
+            You can test your workflow immediately after generation:
+            
+            **Option 1: Run with JSON** - Provide specific inputs in JSON format
+            
+            **Option 2: Run as Tool** - Use natural language to describe what you want the workflow to do
+            
+            """)
+
             with gr.Row():
                 # --- Run generated workflow UI ---
                 generated_workflow_inputs_json = gr.Textbox(
@@ -105,13 +141,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
                     lines=2,
                     interactive=True,
                     elem_id="record_tool_input",
-                )
-                # Add File input for generated tool run
-                generated_tool_files = gr.File(
-                    label="Attach Files (Optional for Tool)",
-                    file_count="multiple",
-                    interactive=True,
-                    elem_id="record_tool_files",
                 )
 
             with gr.Row():
@@ -129,7 +158,18 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # ===============================================================
         # 2. RUN WORKFLOW TAB
         # ===============================================================
-        with gr.TabItem("📥 Upload Workflow"):
+        with gr.TabItem("📥 Run Workflows"):
+            # Add instructions markdown
+            gr.Markdown("""
+            ### Running Saved Workflows
+            
+            You can run workflows you've created or upload workflow files created by others.
+            
+            **Option 1:** Select from your saved workflows in the dropdown below
+            
+            **Option 2:** Upload a workflow YAML file
+            """)
+
             with gr.Group():
                 with gr.Row():
                     workflow_file = gr.File(
@@ -155,6 +195,20 @@ def create_workflows_tab(webui_manager: WebuiManager):
             uploaded_yaml_schema = gr.Code(
                 language="json", label="Input Schema ", interactive=False
             )
+
+            # Add run instructions
+            gr.Markdown("""
+            ### Executing Your Workflow
+            
+            There are two ways to run your workflow:
+            
+            **1. JSON Input:** Provide inputs as a JSON object matching the schema above
+            
+            **2. Natural Language:** Describe what you want the workflow to do in plain English
+            
+            If your inputs don't work or the workflow doesn't behave as expected, you can always modify and try again!
+            """)
+
             with gr.Row():
                 # --- Run generated workflow UI ---
                 uploaded_workflow_inputs_json = gr.Textbox(
@@ -171,13 +225,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
                     interactive=True,
                     info="Give the workflow input via natural language.",
                     elem_id="upload_tool_input",
-                )
-                # Add File input for uploaded tool run
-                uploaded_tool_files = gr.File(
-                    label="Attach Files (Optional for Tool)",
-                    file_count="multiple",
-                    interactive=True,
-                    elem_id="upload_tool_files",
                 )
 
             with gr.Row():
@@ -218,7 +265,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
             generated_tool_input=generated_tool_input,
             generated_run_tool_button=generated_run_tool_button,
             generate_status_output=generate_status_output,
-            generated_tool_files=generated_tool_files,
             # Uploaded
             upload_yaml=upload_yaml,
             uploaded_yaml_schema=uploaded_yaml_schema,
@@ -227,7 +273,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
             run_uploaded_button=run_uploaded_button,
             run_uploaded_tool_button=run_uploaded_tool_button,
             upload_workflow_output=upload_workflow_output,
-            uploaded_tool_files=uploaded_tool_files,
         )
     )
     webui_manager.add_components("workflows", tab_components)
@@ -265,7 +310,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         try:
             llm = llm_provider.get_llm_model(
                 provider=provider,
-                model_name="gpt-4o-mini",
+                model_name="gpt-4o",
                 temperature=temperature,
                 base_url=base_url or None,
                 api_key=api_key or None,
@@ -352,33 +397,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
             return potential_path
 
         return None
-
-    def _process_attached_files(files) -> str:
-        """Process attached files and return content prefix string."""
-        file_content_prefix = ""
-        if not files:
-            return file_content_prefix
-
-        for file_obj in files:
-            try:
-                file_path_str = getattr(file_obj, "name", str(file_obj))
-                if not file_path_str:
-                    continue
-
-                file_path = Path(file_path_str)
-                if file_path.exists():
-                    try:
-                        content = file_path.read_text(encoding="utf-8")
-                        file_content_prefix += f"--- START FILE: {file_path.name} ---\n{content}\n--- END FILE: {file_path.name} ---\n\n"
-                    except UnicodeDecodeError:
-                        # If not a text file, mention that it's a binary file
-                        file_content_prefix += f"--- START FILE: {file_path.name} ---\n[Binary file content - cannot display]\n--- END FILE: {file_path.name} ---\n\n"
-                else:
-                    print(f"Warning: File not found during tool run: {file_path}")
-            except Exception as e:
-                print(f"Error reading file {getattr(file_obj, 'name', 'unknown')}: {e}")
-
-        return file_content_prefix
 
     # ------------------------------------------------------------------
     # Main workflow functions
@@ -510,7 +528,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         if not nl_input or not str(nl_input).strip():
             return {
                 output_component: gr.update(
-                    value="⚠️ Please enter a natural language prompt or attach files for the tool run."
+                    value="⚠️ Please enter a natural language prompt for the tool run."
                 )
             }
 
@@ -549,27 +567,12 @@ def create_workflows_tab(webui_manager: WebuiManager):
         """Run workflow as a tool from generated YAML."""
         yaml_text = components_dict.get(generated_yaml)
         nl_input = components_dict.get(generated_tool_input)
-        files = components_dict.get(generated_tool_files)
 
         if not yaml_text or not yaml_text.strip():
             return {
                 record_workflow_output: gr.update(value="⚠️ No workflow YAML available.")
             }
 
-        # Process files
-        file_content_prefix = _process_attached_files(files)
-
-        # Combine prefix and nl_input
-        combined_nl_input = file_content_prefix + (str(nl_input) if nl_input else "")
-
-        if not combined_nl_input.strip():
-            return {
-                record_workflow_output: gr.update(
-                    value="⚠️ Please enter a prompt or attach files for the tool run."
-                )
-            }
-
-        # Initialize LLM
         settings = _get_agent_settings(components_dict)
         llm = _initialize_llm(
             settings["provider"],
@@ -592,7 +595,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         try:
             tmp_path.write_text(yaml_text, encoding="utf-8")
             return await _execute_workflow_as_tool(
-                tmp_path, combined_nl_input, llm, record_workflow_output
+                tmp_path, nl_input, llm, record_workflow_output
             )
         except Exception as e:
             tb = traceback.format_exc()
@@ -612,7 +615,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
         """Run an uploaded workflow as a tool."""
         yaml_file = components_dict.get(workflow_file)
         nl_input = components_dict.get(uploaded_tool_input)
-        files = components_dict.get(uploaded_tool_files)
 
         # Resolve YAML path
         yaml_path = _resolve_yaml_path(yaml_file)
@@ -620,19 +622,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
             return {
                 upload_workflow_output: gr.update(
                     value=f"⚠️ YAML file not found: {getattr(yaml_file, 'name', str(yaml_file))}"
-                )
-            }
-
-        # Process files
-        file_content_prefix = _process_attached_files(files)
-
-        # Combine prefix and nl_input
-        combined_nl_input = file_content_prefix + (str(nl_input) if nl_input else "")
-
-        if not combined_nl_input.strip():
-            return {
-                upload_workflow_output: gr.update(
-                    value="⚠️ Please enter a prompt or attach files for the tool run."
                 )
             }
 
@@ -656,7 +645,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
         # Execute workflow
         return await _execute_workflow_as_tool(
-            yaml_path, combined_nl_input, llm, upload_workflow_output
+            yaml_path, nl_input, llm, upload_workflow_output
         )
 
     # ------------------------------------------------------------------
