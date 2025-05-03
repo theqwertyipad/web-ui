@@ -36,6 +36,7 @@ class WorkflowRecorder:
 		self.description = ''
 		self.action_name = ''
 		self._workflow_saved = False
+		self.current_url = ''
 
 	async def update_state(self, context, page):
 		await page.evaluate('AgentRecorder.refreshListeners()')
@@ -151,8 +152,27 @@ class WorkflowRecorder:
 					)
 			page.on('load', handle_page_load)
 
+			async def handle_navigation(frame):
+				if frame == page.main_frame: 
+					if self.current_url != page.url:
+						print(f'Navigation detected: {page.url}')
+						new_url = page.url
+						self.current_url = new_url
+						if self.recording:
+							step = WorkflowStep(
+								step_number=len(self.steps) + 1,
+								action_type='navigate',
+								clicked_element={},
+								url=new_url,
+							)
+							self.steps.append(step)
+							self.current_url = new_url
+
+			page.on('framenavigated', handle_navigation)
+
 			await asyncio.sleep(1)
 			await self.overlay_print(f'Navigating to {url}...', page)
+			await self.overlay_print(f'If the actions are not recorded, refresh the page!', page) # This isn't the best solution, but the reload is sometimes needed to initialize the eventhandlers correctly
 			try:
 				await page.goto(url, wait_until='domcontentloaded', timeout=10000)
 				print('Page loaded!')
@@ -172,7 +192,7 @@ class WorkflowRecorder:
 						self._input_future.set_result(payload)
 
 				elif event_type == 'elementClick':
-					attributes = payload.get('attributes', 'enter')
+					attributes = payload.get('attributes', {})
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
 						action_type='click',
@@ -230,6 +250,14 @@ class WorkflowRecorder:
 						await self.set_recording_state(page, True)
 						self._workflow_saved = False
 						await self.overlay_print('🟢 Recording started.', page)
+						# Setting as first step the URL
+						step = WorkflowStep(
+							step_number=len(self.steps) + 1,
+							action_type='navigate',
+							clicked_element={},
+							url=page.url,
+						)
+						self.steps.append(step)
 					elif action == 'finish':
 						await self.set_recording_state(page, False)
 						self._active_input = None  # This can cause problems in the future
@@ -266,7 +294,7 @@ class WorkflowRecorder:
 						self._recording_complete.set()
 
 			self._notify_python = notify_python
-			await page.expose_function('notifyPython', self._notify_python)
+			await self.expose_notify_python(page)
 
 			await self._recording_complete.wait()
 
@@ -302,6 +330,11 @@ class WorkflowRecorder:
 		"""Save the recorded workflow to a file"""
 		if self._workflow_saved:
 			print('Workflow already saved, skipping.')
+			return
+		# Check if there are no steps
+		if not self.steps:
+			print('No steps to save, skipping workflow save.')
+			self._workflow_saved = True
 			return
 		try:
 			# Use a default directory for the output
