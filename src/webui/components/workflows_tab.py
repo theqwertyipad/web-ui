@@ -44,11 +44,20 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # 1. GENERATE WORKFLOW TAB
         # ===============================================================
         with gr.TabItem("⏺️ Record"):
+            # Add experimental notice
+            gr.Markdown("""
+            > **⚠️ EXPERIMENTAL FEATURE** - This workflow functionality is in beta. Please submit feedback to help us improve!
+            """)
+
             # Add instructions markdown
             gr.Markdown("""
             ### Recording a Workflow
             
-            **Step 1:** Install the browser extension from the Agent Settings tab
+            **Step 1:** Install the browser extension
+            - Open Chrome and navigate to `chrome://extensions/`
+            - Enable "Developer mode" in the top-right corner
+            - Click "Load unpacked" and select the extension folder from this project
+            - The extension should now appear in your Chrome toolbar
             
             **Step 2:** Open a new tab and turn on recording (click the extension icon)
             
@@ -113,7 +122,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 save_generated_button = gr.Button(
                     "💾 Save Workflow", variant="secondary"
                 )
-            
+
             # Add run instructions for generated workflow
             gr.Markdown("""
             ### Testing Your Generated Workflow
@@ -159,6 +168,11 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # 2. RUN WORKFLOW TAB
         # ===============================================================
         with gr.TabItem("📥 Run Workflows"):
+            # Add experimental notice
+            gr.Markdown("""
+            > **⚠️ EXPERIMENTAL FEATURE** - This workflow functionality is in beta. Please submit feedback to help us improve!
+            """)
+
             # Add instructions markdown
             gr.Markdown("""
             ### Running Saved Workflows
@@ -511,7 +525,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
             return gr.update(value=f"❌ Error running workflow: {e}\n\n{tb}")
 
     async def _execute_workflow_as_tool(
-        yaml_path: Path, nl_input: str, llm: Any, output_component: Component
+        yaml_path: Path, nl_input: Optional[str], llm: Any, output_component: Component
     ):
         """
         Core function to execute a workflow as a tool.
@@ -532,6 +546,9 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 )
             }
 
+        # Ensure nl_input is a string
+        nl_input_str = str(nl_input) if nl_input is not None else ""
+
         if llm is None:
             return {
                 output_component: gr.update(
@@ -547,7 +564,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
             )
             browser = Browser(config=config)
             workflow = Workflow(yaml_path=str(yaml_path), llm=llm, browser=browser)
-            result = await workflow.run_as_tool(nl_input)
+            result = await workflow.run_as_tool(nl_input_str)
             return {
                 output_component: gr.update(value=f"✅ Tool run completed:\n\n{result}")
             }
@@ -573,6 +590,17 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 record_workflow_output: gr.update(value="⚠️ No workflow YAML available.")
             }
 
+        if not nl_input or not str(nl_input).strip():
+            return {
+                record_workflow_output: gr.update(
+                    value="⚠️ Please enter a prompt for the tool run."
+                )
+            }
+
+        # Ensure nl_input is a string
+        nl_input_str = str(nl_input) if nl_input is not None else ""
+
+        # Initialize LLM
         settings = _get_agent_settings(components_dict)
         llm = _initialize_llm(
             settings["provider"],
@@ -595,7 +623,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         try:
             tmp_path.write_text(yaml_text, encoding="utf-8")
             return await _execute_workflow_as_tool(
-                tmp_path, nl_input, llm, record_workflow_output
+                tmp_path, nl_input_str, llm, record_workflow_output
             )
         except Exception as e:
             tb = traceback.format_exc()
@@ -625,6 +653,16 @@ def create_workflows_tab(webui_manager: WebuiManager):
                 )
             }
 
+        if not nl_input or not str(nl_input).strip():
+            return {
+                upload_workflow_output: gr.update(
+                    value="⚠️ Please enter a prompt for the tool run."
+                )
+            }
+
+        # Ensure nl_input is a string
+        nl_input_str = str(nl_input) if nl_input is not None else ""
+
         # Initialize LLM
         settings = _get_agent_settings(components_dict)
         llm = _initialize_llm(
@@ -645,7 +683,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
         # Execute workflow
         return await _execute_workflow_as_tool(
-            yaml_path, nl_input, llm, upload_workflow_output
+            yaml_path, nl_input_str, llm, upload_workflow_output
         )
 
     # ------------------------------------------------------------------
