@@ -87,50 +87,6 @@ class WorkflowRecorder:
 		except asyncio.CancelledError:
 			return ''
 
-	async def monitor_gui_and_state(self, page, context, interval=2.0):
-		"""Continuously check if the GUI is present and update the state if recording."""
-		last_path_hashes = set()
-		while not self._should_exit:  # Check for exit condition
-			try:
-				# Check for GUI presence
-				is_overlay_visible = await page.evaluate("document.querySelector('#agent-recorder-ui') !== null")
-				if not is_overlay_visible:
-					print('[🔁] Reinjecting GUI overlay...')
-					await page.evaluate(self.js_overlay, self.recording)
-					await page.evaluate('AgentRecorder.setRecording', self.recording)
-					await asyncio.sleep(1.0)  # Wait for DOM to stabilize
-
-					# Re-expose notifyPython function
-					try:
-						await page.expose_function('notifyPython', self._notify_python)
-						print('[🔗] Re-exposed notifyPython')
-					except Exception as expose_err:
-						print(f'[⚠️] Could not re-expose notifyPython: {expose_err}')
-
-					# Restore logs
-					for msg in self._overlay_logs:
-						await page.evaluate('(msg) => AgentRecorder.requestOutput(msg)', msg)
-
-					# Restore input
-					if self._active_input:
-						await page.evaluate('(data) => AgentRecorder.requestInput(data)', self._active_input)
-					# Restore steps in the side panel
-					for step in self.steps:
-						if step.action_type.startswith('type'):
-							action = 'Type text'
-						else:
-							action = f'{step.action_type.title()} on {step.clicked_element.get("tag_name", "element")}'
-
-						await page.evaluate(
-							'(action) => AgentRecorder.addWorkflowStep(action)',
-							action,
-						)
-
-			except Exception as e:
-				print(f'[⚠️] Background monitor error: {str(e)}')
-
-			await asyncio.sleep(interval)
-
 	async def record_workflow(self, url: str):
 		"""Record a workflow by following user clicks and keyboard input"""
 		browser = Browser(
@@ -156,16 +112,25 @@ class WorkflowRecorder:
 
 			# asyncio.create_task(self.monitor_gui_and_state(page, context))
 			async def handle_page_load(page) -> None:
+				# Let patchright load
+				await asyncio.sleep(1)
 				# Reinject overlay
 				await page.evaluate(self.js_overlay, self.recording)
 				await page.wait_for_selector('#agent-recorder-ui', timeout=2000)
-
+				
 				# Restore recording state
 				await page.evaluate('(state) => AgentRecorder.setRecording(state)', self.recording)
-
+				
+				# Re-expose notifyPython function
+				try:
+					await page.expose_function('notifyPython', self._notify_python)
+					print('[🔗] Re-exposed notifyPython')
+				except Exception as expose_err:
+					print(f'[⚠️] Could not re-expose notifyPython: {expose_err}')
+				
 				for msg in self._overlay_logs:
 					await page.evaluate('(msg) => AgentRecorder.requestOutput(msg)', msg)
-
+				
 				# Restore input
 				if self._active_input:
 					await page.evaluate('(data) => AgentRecorder.requestInput(data)', self._active_input)
@@ -175,7 +140,7 @@ class WorkflowRecorder:
 						action = 'Type text'
 					else:
 						action = f'{step.action_type.title()} on {step.clicked_element.get("tag_name", "element")}'
-
+					
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
 						action,
@@ -188,7 +153,8 @@ class WorkflowRecorder:
 				await self.overlay_print(f'Navigating to {url}...', page)
 				try:
 					await page.goto(url, wait_until='domcontentloaded', timeout=10000)
-					await self.overlay_print('Page loaded!', page)
+					# Let patchright load
+					await asyncio.sleep(2)
 				except Exception as e:
 					await self.overlay_print(f'Error navigating to {url}: {str(e)}', page)
 					return
@@ -239,6 +205,22 @@ class WorkflowRecorder:
 						step.action_type,
 					)
 					await self.overlay_print(f"⌨️ Recorded {action_type} into", page)
+					await self.update_state(context, page)
+
+				elif event_type == 'navigate':
+					url = payload.get('url', '')
+					step = WorkflowStep(
+						step_number=len(self.steps) + 1,
+						action_type='navigate',
+						clicked_element={},
+						url=url,
+					)
+					self.steps.append(step)
+					await page.evaluate(
+						'(action) => AgentRecorder.addWorkflowStep(action)',
+						step.action_type,
+					)
+					await self.overlay_print(f'🌐 Recorded navigation to {url}', page)
 					await self.update_state(context, page)
 
 				elif event_type == 'control':

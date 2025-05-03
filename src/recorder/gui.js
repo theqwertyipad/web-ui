@@ -1,4 +1,5 @@
 (function (recording = false) {
+  const fontFamily = "'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const overlay = document.createElement('div');
   overlay.id = 'agent-recorder-ui';
 
@@ -6,13 +7,13 @@
     position: 'fixed',
     top: '100px',
     right: '30px',
-    width: '350px',
+    width: '300px',
     background: '#1a1a1a',
     color: '#fff',
     padding: '16px',
     borderRadius: '12px',
     zIndex: 2147483647,
-    fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    fontFamily: fontFamily,
     fontSize: '15px',
     boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
     userSelect: 'none',
@@ -30,7 +31,7 @@
   header.style.fontSize = '16px';
 
   const title = document.createElement('span');
-  title.innerText = 'Browser-use Workflow Recorder';
+  title.innerText = 'Workflow Recorder';
   const sidePanel = document.createElement('div');
   sidePanel.id = 'workflow-history';
   Object.assign(sidePanel.style, {
@@ -43,7 +44,7 @@
     padding: '16px',
     borderRadius: '12px',
     zIndex: 2147483646,
-    fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    fontFamily: fontFamily,
     fontSize: '14px',
     boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
     overflowY: 'auto',
@@ -169,7 +170,7 @@
     padding: '8px',
     borderRadius: '6px',
     minHeight: '80px',
-    fontFamily: 'monospace',
+    fontFamily: fontFamily,
     fontSize: '13px',
     overflowY: 'auto',
     maxHeight: '120px',
@@ -386,8 +387,9 @@
     historyList.appendChild(container);
   };
 
-  // Track typing
-  document.addEventListener('keydown', (e) => {
+  // Define the event handlers
+  const keydownHandler = (e) => {
+    console.log('keydown event triggered');
     if (!isRecording) return;
 
     if (e.key.length === 1) {
@@ -403,9 +405,10 @@
         currentTypedText = '';
       }
     }
-  });
+  };
 
-  document.addEventListener('click', (event) => {
+  const clickHandler = (event) => {
+    console.log('click event triggered');
     if (!isRecording) return;
 
     // Check if the click is on the recorder UI
@@ -419,22 +422,72 @@
 
     // Send all attributes to notifyPython
     window.notifyPython?.('elementClick', { attributes });
-  });
-  // Track navigation
-  window.addEventListener('popstate', () => {
-    if (!isRecording) return;
-    window.notifyPython?.('navigate', { url: window.location.href });
-  });
+  };
 
-  // Track page loads
-  window.addEventListener('load', () => {
+  const popstateHandler = () => {
+    console.log('popstate event triggered');
     if (!isRecording) return;
     window.notifyPython?.('navigate', { url: window.location.href });
-  });
+  };
+
+  const loadHandler = () => {
+    console.log('load event triggered');
+    if (!isRecording) return;
+    window.notifyPython?.('navigate', { url: window.location.href });
+  };
+
+  // Attach event listeners when the script first executes
+  document.addEventListener('keydown', keydownHandler);
+  document.keydownHandlerAttached = true;
+
+  document.addEventListener('click', clickHandler);
+  document.clickHandlerAttached = true;
+
+  window.addEventListener('popstate', popstateHandler);
+  window.popstateHandlerAttached = true;
+
+  window.addEventListener('load', loadHandler);
+  window.loadHandlerAttached = true;
 
   window.AgentRecorder = {
     refreshListeners: () => {
-      console.log('FFF');
+      console.log('Reattaching event listeners if not already attached');
+
+      // Check and attach keydown event listener
+      if (document.keydownHandlerAttached) {
+        console.log('keydown event listener already attached');
+      } else {
+        console.log('attaching keydown event listener');
+        document.addEventListener('keydown', keydownHandler);
+        document.keydownHandlerAttached = true;
+      }
+
+      // Check and attach click event listener
+      if (document.clickHandlerAttached) {
+        console.log('click event listener already attached');
+      } else {
+        console.log('attaching click event listener');
+        document.addEventListener('click', clickHandler);
+        document.clickHandlerAttached = true;
+      }
+
+      // Check and attach popstate event listener
+      if (window.popstateHandlerAttached) {
+        console.log('popstate event listener already attached');
+      } else {
+        console.log('attaching popstate event listener');
+        window.addEventListener('popstate', popstateHandler);
+        window.popstateHandlerAttached = true;
+      }
+
+      // Check and attach load event listener
+      if (window.loadHandlerAttached) {
+        console.log('load event listener already attached');
+      } else {
+        console.log('attaching load event listener');
+        window.addEventListener('load', loadHandler);
+        window.loadHandlerAttached = true;
+      }
     },
     requestOutput: (text) => {
       printToOutput(text);
