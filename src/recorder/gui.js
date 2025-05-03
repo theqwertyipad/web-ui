@@ -6,8 +6,8 @@
     position: 'fixed',
     top: '100px',
     right: '30px',
-    width: '400px', // Increased width to accommodate button column
-    background: '#1f1f1f',
+    width: '350px',
+    background: '#1a1a1a',
     color: '#fff',
     padding: '16px',
     borderRadius: '12px',
@@ -37,8 +37,8 @@
     position: 'fixed',
     top: '100px',
     right: '450px', // Adjusted to account for wider main panel (400px + padding)
-    width: '300px',
-    background: '#1b1b1b',
+    width: '250px',
+    background: '#161616',
     color: '#fff',
     padding: '16px',
     borderRadius: '12px',
@@ -63,7 +63,7 @@
 
   sidePanel.appendChild(historyTitle);
   const backButton = document.createElement('button');
-  backButton.innerText = '⬅️ Undo Last Step';
+  backButton.innerText = 'Undo Last Step';
   Object.assign(backButton.style, {
     marginBottom: '12px',
     background: '#444',
@@ -91,7 +91,7 @@
   Object.assign(toggleBtn.style, {
     background: recording ? '#e53935' : '#4CAF50',
     color: 'white',
-    padding: '4px 10px',
+    padding: '3px 8px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -112,7 +112,7 @@
   Object.assign(toggleHistoryBtn.style, {
     background: '#3a3a3a',
     color: 'white',
-    padding: '4px 8px',
+    padding: '3px 6px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -219,7 +219,7 @@
     marginTop: '10px',
     background: '#007bff',
     color: '#fff',
-    padding: '4px 10px',
+    padding: '3px 8px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -237,7 +237,7 @@
     marginTop: '10px',
     background: '#dc3545',
     color: '#fff',
-    padding: '4px 10px',
+    padding: '3px 8px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -259,7 +259,6 @@
   closeBtn.style.flex = '1';
   buttonRow.appendChild(closeBtn);
 
-  let lastClickedIndex = null;
   let currentTypedText = '';
   let recordingState = recording;
 
@@ -272,42 +271,9 @@
     toggleBtn.textContent = state ? 'Stop' : 'Start';
     toggleBtn.style.background = state ? '#e53935' : '#4CAF50';
 
-    if (state) {
-      attachListenersToHighlightedElements();
-
-      if (!window.__recordingKeyListenerAttached) {
-        document.addEventListener('keydown', (e) => {
-          printToOutput(`⌨️ Currently registered: "${currentTypedText}"`);
-          const isTypingInOverlay =
-            document.activeElement &&
-            overlay.contains(document.activeElement) &&
-            document.activeElement.tagName === 'INPUT';
-
-          if (isTypingInOverlay || !isRecording()) return;
-
-          if (e.key.length === 1) {
-            currentTypedText += e.key;
-          } else if (e.key === 'Backspace') {
-            currentTypedText = currentTypedText.slice(0, -1);
-          } else if (
-            e.key === 'Enter' &&
-            currentTypedText &&
-            lastClickedIndex !== null
-          ) {
-            window.notifyPython?.('elementType', {
-              index: lastClickedIndex,
-              text: currentTypedText,
-              mode: 'enter',
-            });
-            printToOutput(
-              `⌨️ Sent typed text for index ${lastClickedIndex} on Enter: "${currentTypedText}"`
-            );
-            currentTypedText = '';
-          }
-        });
-        window.__recordingKeyListenerAttached = true;
-      }
-    }
+    // if (state) {
+    //   attachListeners();
+    // }
   }
 
   function isRecording() {
@@ -357,15 +323,33 @@
     setRecordingState(newState);
     window.notifyPython?.('control', { action: newState ? 'start' : 'finish' });
     printToOutput(newState ? '▶️ Recording started' : '⏹️ Recording stopped');
+    if (!newState) {
+      // Clear the history list when recording is stopped
+      while (historyList.firstChild) {
+        historyList.removeChild(historyList.firstChild);
+      }
+    }
   };
 
-  const printToOutput = (text) => {
-    const line = document.createElement('div');
-    line.textContent = text;
-    outputBox.appendChild(line);
+  const printToOutput = ({ text, isNew = true }) => {
+    if (isNew) {
+      const line = document.createElement('div');
+      line.textContent = text;
+      outputBox.appendChild(line);
+    } else {
+      const lastLine = outputBox.lastElementChild;
+      if (lastLine) {
+        lastLine.textContent += text;
+      } else {
+        // If there's no existing line, create a new one
+        const line = document.createElement('div');
+        line.textContent = text;
+        outputBox.appendChild(line);
+      }
+    }
     outputBox.scrollTop = outputBox.scrollHeight;
   };
-  const renderWorkflowStep = ({ step, action, validator }) => {
+  const renderWorkflowStep = ({ step, action }) => {
     const container = document.createElement('div');
     container.style.display = 'flex';
     container.style.alignItems = 'flex-start';
@@ -393,13 +377,7 @@
     actionText.innerText = `🛠 ${action}`;
     actionText.style.fontWeight = 'bold';
 
-    const validatorText = document.createElement('div');
-    validatorText.innerText = `✔️ ${validator}`;
-    validatorText.style.fontSize = '13px';
-    validatorText.style.color = '#aaa';
-
     info.appendChild(actionText);
-    info.appendChild(validatorText);
 
     container.appendChild(dot);
     container.appendChild(info);
@@ -408,71 +386,55 @@
     historyList.appendChild(container);
   };
 
-  function attachListenersToHighlightedElements() {
-    const container = document.getElementById('playwright-highlight-container');
-    if (!container) {
-      console.warn('Highlight container not found.');
-      return;
-    }
+  // Track typing
+  document.addEventListener('keydown', (e) => {
+    if (!isRecording) return;
 
-    const children = Array.from(container.children);
-    for (let i = 0; i < children.length - 1; i++) {
-      const box = children[i];
-      const label = children[i + 1];
-
-      // Skip if label is not valid
-      if (
-        !label.classList.contains('playwright-highlight-label') ||
-        box.dataset.__listenerAttached
-      ) {
-        continue;
+    if (e.key.length === 1) {
+      currentTypedText += e.key;
+    } else if (e.key === 'Backspace') {
+      currentTypedText = currentTypedText.slice(0, -1);
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      if (currentTypedText) {
+        window.notifyPython?.('elementType', {
+          text: currentTypedText,
+          mode: 'enter',
+        });
+        currentTypedText = '';
       }
-
-      const highlightIndex = label.textContent?.trim();
-      if (!highlightIndex) continue;
-
-      box.dataset.highlightIndex = highlightIndex;
-      box.dataset.__listenerAttached = 'true';
-      box.style.pointerEvents = 'auto';
-      box.style.cursor = 'pointer';
-
-      let inside = false;
-
-      box.addEventListener('mouseenter', () => {
-        inside = true;
-        printToOutput(`🟢 Hovered box ${highlightIndex}`);
-      });
-
-      box.addEventListener('mouseleave', () => {
-        inside = false;
-        printToOutput(`🔵 Exited box ${highlightIndex}`);
-      });
-
-      box.addEventListener('click', () => {
-        if (!isRecording() || !inside) return;
-
-        if (currentTypedText && lastClickedIndex !== null) {
-          window.notifyPython?.('elementType', {
-            index: lastClickedIndex,
-            text: currentTypedText,
-            mode: 'followed_by_click',
-          });
-          printToOutput(
-            `⌨️ Sent typed text for index ${lastClickedIndex} before clicking: "${currentTypedText}"`
-          );
-          currentTypedText = '';
-        }
-
-        printToOutput(`🔥 Clicked box ${highlightIndex}`);
-        window.notifyPython?.('elementClick', { index: highlightIndex });
-        lastClickedIndex = highlightIndex;
-      });
     }
-  }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!isRecording) return;
+
+    // Check if the click is on the recorder UI
+    if (overlay.contains(event.target)) return;
+
+    // Gather all attributes of the clicked element
+    const attributes = {};
+    for (let attr of event.target.attributes) {
+      attributes[attr.name] = attr.value;
+    }
+
+    // Send all attributes to notifyPython
+    window.notifyPython?.('elementClick', { attributes });
+  });
+  // Track navigation
+  window.addEventListener('popstate', () => {
+    if (!isRecording) return;
+    window.notifyPython?.('navigate', { url: window.location.href });
+  });
+
+  // Track page loads
+  window.addEventListener('load', () => {
+    if (!isRecording) return;
+    window.notifyPython?.('navigate', { url: window.location.href });
+  });
 
   window.AgentRecorder = {
     refreshListeners: () => {
-      attachListenersToHighlightedElements();
+      console.log('FFF');
     },
     requestOutput: (text) => {
       printToOutput(text);
@@ -638,9 +600,9 @@
         inputBox.appendChild(submit);
       }
     },
-    addWorkflowStep: (action, validator) => {
+    addWorkflowStep: (action) => {
       const step = historyList.children.length;
-      renderWorkflowStep({ step, action, validator });
+      renderWorkflowStep({ step, action });
     },
   };
   setTimeout(() => {
