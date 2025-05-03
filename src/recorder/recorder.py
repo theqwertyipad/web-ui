@@ -35,6 +35,7 @@ class WorkflowRecorder:
 		self._should_exit = False
 		self.description = ''
 		self.action_name = ''
+		self._workflow_saved = False
 
 	async def update_state(self, context, page):
 		await page.evaluate('AgentRecorder.refreshListeners()')
@@ -107,9 +108,7 @@ class WorkflowRecorder:
 			page = await context.get_current_page()
 			page.set_default_navigation_timeout(10000)
 			await page.evaluate(self.js_overlay, self.recording)
-			await page.evaluate('AgentRecorder.setRecording', self.recording)
 
-			# asyncio.create_task(self.monitor_gui_and_state(page, context))
 			async def handle_page_load(page) -> None:
 				# Let patchright load
 				await asyncio.sleep(1)
@@ -219,6 +218,7 @@ class WorkflowRecorder:
 					action = payload.get('action')
 					if action == 'start':
 						await self.set_recording_state(page, True)
+						self._workflow_saved = False
 						await self.overlay_print('🟢 Recording started.', page)
 					elif action == 'finish':
 						await self.set_recording_state(page, False)
@@ -259,7 +259,6 @@ class WorkflowRecorder:
 			await page.expose_function('notifyPython', self._notify_python)
 
 			await self._recording_complete.wait()
-			print('DONE')
 
 		except Exception as e:
 			await self.overlay_print(f'An unexpected error occurred during recording: {str(e)}', page)
@@ -270,22 +269,30 @@ class WorkflowRecorder:
 
 		finally:
 			self.recording = False
-			if self.steps:
+			if self.steps and not self._workflow_saved:
 				await self.overlay_print('Finalizing workflow save...', page)
 				self.save_workflow()
 				await self.overlay_print('Workflow saving process complete.', page)
-			else:
+			elif not self.steps:
 				await self.overlay_print('No steps were recorded.', page)
+			
+			# Clear steps after all operations
+			if self._should_exit:
+				self.steps = []
 
 			if context:
 				try:
 					await context.close()
-					await self.overlay_print('Browser context closed.', page)
+					print('Browser context closed.')
 				except Exception as close_err:
 					await self.overlay_print(f'Warning: Error closing browser context: {str(close_err)}', page)
+			
 
 	def save_workflow(self):
 		"""Save the recorded workflow to a file"""
+		if self._workflow_saved:
+			print('Workflow already saved, skipping.')
+			return
 		try:
 			# Use a default directory for the output
 			default_output_dir = 'workflows'
@@ -324,6 +331,7 @@ class WorkflowRecorder:
 			if os.path.exists(filepath):
 				file_size = os.path.getsize(filepath)
 				print(f'✅ Workflow successfully saved to {filepath} ({file_size} bytes)')
+				self._workflow_saved = True
 			else:
 				print(f'❌ Error: File was not created at {filepath}')
 
@@ -336,5 +344,6 @@ class WorkflowRecorder:
 				with open(fallback_path, 'w', encoding='utf-8') as f:
 					json.dump(workflow_data, f, indent=4, ensure_ascii=False)
 				print(f'✅ Workflow saved to fallback location: {fallback_path}')
+				self._workflow_saved = True
 			except Exception as fallback_error:
 				print(f'❌ Failed to save to fallback location: {str(fallback_error)}')
