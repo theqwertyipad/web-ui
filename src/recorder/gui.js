@@ -11,7 +11,7 @@
     background: '#1a1a1a',
     color: '#fff',
     padding: '16px',
-    borderRadius: '12px',
+    borderRadius: '0 12px 12px 12px',
     zIndex: 2147483647,
     fontFamily: fontFamily,
     fontSize: '15px',
@@ -42,7 +42,7 @@
     background: '#161616',
     color: '#fff',
     padding: '16px',
-    borderRadius: '12px',
+    borderRadius: '12px 0 0 12px',
     zIndex: 2147483646,
     fontFamily: fontFamily,
     fontSize: '14px',
@@ -130,7 +130,7 @@
     if (!isVisible) {
       const rect = overlay.getBoundingClientRect();
       sidePanel.style.top = `${rect.top}px`;
-      sidePanel.style.left = `${rect.left - sidePanel.offsetWidth - 20}px`;
+      sidePanel.style.left = `${rect.left - sidePanel.offsetWidth}px`;
       sidePanel.style.right = 'auto';
     }
   };
@@ -223,7 +223,7 @@
 
   mainContent.appendChild(buttonRow);
   const refreshBtn = document.createElement('button');
-  refreshBtn.innerText = 'Update State';
+  refreshBtn.innerText = 'Refresh';
   Object.assign(refreshBtn.style, {
     marginTop: '10px',
     background: '#007bff',
@@ -315,7 +315,7 @@
 
       if (sidePanel.style.display !== 'none') {
         sidePanel.style.top = `${newTop}px`;
-        sidePanel.style.left = `${newLeft - sidePanel.offsetWidth - 20}px`; // 20px gap
+        sidePanel.style.left = `${newLeft - sidePanel.offsetWidth}px`; // 20px gap
         sidePanel.style.right = 'auto';
       }
     }
