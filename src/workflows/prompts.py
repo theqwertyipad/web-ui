@@ -9,7 +9,7 @@ Your task is to convert a JSON recording of browser events (shown below) into an
 *executable JSON workflow* that the runtime can consume **directly**.
 
 Follow these rules when generating the output JSON:
-1. Top-level keys (in order): \"name\", \"description\", \"input_schema\" (optional), \"steps\".
+1. Top-level keys (in order): \"name\", \"description\", \"input_schema\" (optional), \"steps\" and \"version\".
    • \"input_schema\" – if present – MUST follow JSON-Schema draft-7 subset semantics:
        {{
          \"type\": \"object\", 
@@ -35,6 +35,8 @@ Follow these rules when generating the output JSON:
    goal.
 4. Quote all placeholder values to ensure the JSON parser treats them as
    strings.
+5. In the events you will find all the selectors relative to a particular action, replicate all of them in the workflow.
+
 
 High-level task description provided by the user (may be empty):
 {goal}
