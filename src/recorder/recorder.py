@@ -15,10 +15,10 @@ from src.utils import utils
 @dataclass
 class WorkflowStep:
 	step_number: int
-	action_type: str
+	type: str
 	clicked_element: dict
 	url: str
-	typed_text: str = ''
+	timestamp: int = 0
 
 
 class WorkflowRecorder:
@@ -127,8 +127,11 @@ class WorkflowRecorder:
 			async def handle_page_load(page) -> None:
 				# Let patchright load
 				await asyncio.sleep(1)
-				# Reinject overlay
-				await page.evaluate(self.js_overlay, self.recording)
+				# Check if the overlay is already present
+				is_overlay_present = await page.evaluate('document.querySelector("#agent-recorder-ui") !== null')
+				if not is_overlay_present:
+					# Reinject overlay if not present
+					await page.evaluate(self.js_overlay, self.recording)
 				await page.wait_for_selector('#agent-recorder-ui', timeout=2000)
 				
 				# Restore recording state
@@ -145,7 +148,7 @@ class WorkflowRecorder:
 					await page.evaluate('(data) => AgentRecorder.requestInput(data)', self._active_input)
 				# Restore steps in the side panel
 				for step in self.steps:
-					action = step.action_type
+					action = step.type
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
 						action,
@@ -161,9 +164,10 @@ class WorkflowRecorder:
 						if self.recording:
 							step = WorkflowStep(
 								step_number=len(self.steps) + 1,
-								action_type='navigate',
+								type='navigation',
 								clicked_element={},
 								url=new_url,
+								timestamp=int(datetime.datetime.now().timestamp() * 1000)
 							)
 							self.steps.append(step)
 							self.current_url = new_url
@@ -192,54 +196,109 @@ class WorkflowRecorder:
 						self._input_future.set_result(payload)
 
 				elif event_type == 'elementClick':
-					attributes = payload.get('attributes', {})
+					attributes = {
+						'frameUrl': payload.get('frameUrl', ''),
+						'xpath': payload.get('xpath', ''),
+						'cssSelector': payload.get('cssSelector', ''),
+						'elementTag': payload.get('elementTag', ''),
+						'elementText': payload.get('elementText', '')
+					}
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
-						action_type='click',
+						type='click',
 						clicked_element=attributes,
-						url=page.url,
+						url=payload.get('url', ''),
+						timestamp=int(datetime.datetime.now().timestamp() * 1000)
 					)
 					self.steps.append(step)
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.action_type,
+						step.type,
 					)
 					await self.overlay_print(f'🖱️ Recorded click', page)
 					await self.update_state(context, page)
 
-				elif event_type == 'elementType':
-					text = payload.get('text', '')
-					mode = payload.get('mode', 'enter')
-
-					action_type = 'type-enter' if mode == 'enter' else 'type-then-click'
-
+				elif event_type == 'elementInput':
+					attributes = {
+						'frameUrl': payload.get('frameUrl', ''),
+						'xpath': payload.get('xpath', ''),
+						'cssSelector': payload.get('cssSelector', ''),
+						'elementTag': payload.get('elementTag', ''),
+						'value': payload.get('value', ''),
+					}
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
-						action_type=action_type,
-						clicked_element={},
-						url=page.url,
-						typed_text=text,
+						type='input',
+						clicked_element=attributes,
+						url=payload.get('url', ''),
+						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000))
 					)
 					self.steps.append(step)
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.action_type,
+						step.type,
 					)
-					await self.overlay_print(f"⌨️ Recorded {action_type} into", page)
+					await self.overlay_print(f"⌨️ Recorded {type} into", page)
+					await self.update_state(context, page)
+				elif event_type == 'elementChange':
+					attributes = {
+						'frameUrl': payload.get('frameUrl', ''),
+						'xpath': payload.get('xpath', ''),
+						'cssSelector': payload.get('cssSelector', ''),
+						'elementTag': payload.get('elementTag', ''),
+						'selected_value': payload.get('selectedValue', ''),
+						'selected_text ': payload.get('selectedText', '')
+					}
+					step = WorkflowStep(
+						step_number=len(self.steps) + 1,
+						type='select_change',
+						clicked_element=attributes,
+						url=payload.get('url', ''),
+						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000))
+					)
+					self.steps.append(step)
+					await page.evaluate(
+						'(action) => AgentRecorder.addWorkflowStep(action)',
+						step.type,
+					)
+					await self.overlay_print(f'🔽 Recorded select change', page)
+					await self.update_state(context, page)
+				elif event_type == 'keydownEvent':
+					attributes = {
+						'frameUrl': payload.get('frameUrl', ''),
+						'key':payload.get('key', ''),
+						'xpath': payload.get('xpath', ''),
+						'cssSelector': payload.get('cssSelector', ''),
+						'elementTag': payload.get('elementTag', '')
+					}
+					step = WorkflowStep(
+						step_number=len(self.steps) + 1,
+						type='key_press',
+						clicked_element=attributes,
+						url=page.url,
+						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000))
+					)
+					self.steps.append(step)
+					await page.evaluate(
+						'(action) => AgentRecorder.addWorkflowStep(action)',
+						step.type,
+					)
+					await self.overlay_print(f'⌨️ Recorded keydown: {payload.get("key", "")}', page)
 					await self.update_state(context, page)
 
-				elif event_type == 'navigate':
+				elif event_type == 'navigation':
 					url = payload.get('url', '')
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
-						action_type='navigate',
+						type='navigation',
 						clicked_element={},
 						url=url,
+						timestamp=int(datetime.datetime.now().timestamp() * 1000)
 					)
 					self.steps.append(step)
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.action_type,
+						step.type,
 					)
 					await self.overlay_print(f'🌐 Recorded navigation to {url}', page)
 					await self.update_state(context, page)
@@ -253,9 +312,10 @@ class WorkflowRecorder:
 						# Setting as first step the URL
 						step = WorkflowStep(
 							step_number=len(self.steps) + 1,
-							action_type='navigate',
+							type='navigation',
 							clicked_element={},
 							url=page.url,
+							timestamp=int(datetime.datetime.now().timestamp() * 1000)
 						)
 						self.steps.append(step)
 					elif action == 'finish':
@@ -277,7 +337,7 @@ class WorkflowRecorder:
 					elif action == 'back':
 						if self.steps:
 							removed = self.steps.pop()
-							await self.overlay_print(f'↩️ Removed step {removed.step_number}: {removed.action_type}', page)
+							await self.overlay_print(f'↩️ Removed step {removed.step_number}: {removed.type}', page)
 							await self.update_state(context, page)
 					elif action == 'close':
 						await self.set_recording_state(page, False)
@@ -331,8 +391,8 @@ class WorkflowRecorder:
 		if self._workflow_saved:
 			print('Workflow already saved, skipping.')
 			return
-		# Check if there are no steps or only one step with 'navigate' action_type
-		if not self.steps or (len(self.steps) == 1 and self.steps[0].action_type == 'navigate'):
+		# Check if there are no steps or only one step with 'navigation' type
+		if not self.steps or (len(self.steps) == 1 and self.steps[0].type == 'navigation'):
 			print('No meaningful steps to save, skipping workflow save.')
 			self._workflow_saved = True
 			return
@@ -356,12 +416,12 @@ class WorkflowRecorder:
 				'steps': [
 					{
 						'step_number': step.step_number,
-						'action_type': step.action_type,
+						'type': step.type,
+						'timestamp': step.timestamp,
 						'clicked_element': {
 							**step.clicked_element,
 						},
 						'url': step.url,
-						'typed_text': step.typed_text,
 					}
 					for step in self.steps
 				],
