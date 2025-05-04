@@ -215,30 +215,28 @@ def parse_session(
         _prepare_event_messages(session_events, include_screenshots=use_screenshots)
     )
 
-    json_response = llm.invoke([HumanMessage(content=cast(Any, vision_messages))])
-    json_content: str = str(json_response.content).strip()
+    # Invoke the LLM to get the workflow as text
+    llm_response = llm.invoke([HumanMessage(content=cast(Any, vision_messages))])
+    llm_content: str = str(llm_response.content).strip()
 
-    # Validate that action types match the model
-    prompt_str = (
-        prompt_str
-        + "\n\nIMPORTANT: Please ensure that all parameter types in the generated JSON strictly conform to the input models defined for each action. For example, if an action expects a 'url' parameter of type string, the JSON must provide a string value, not a number or boolean. Check each parameter against its corresponding model definition."
-    )
+    # TODO: Use structured output to make this better.
+    # Extract the JSON content from the markdown code block
+    json_content = llm_content  # Default to full content if extraction fails
+    if "```json" in llm_content:
+        # Find the start and end of the json block
+        start_index = llm_content.find("```json") + len("```json\n")
+        end_index = llm_content.rfind("```")
+        if start_index != -1 and end_index != -1 and start_index < end_index:
+            json_content = llm_content[start_index:end_index].strip()
+    elif llm_content.startswith("```"):
+        # Fallback for generic code blocks if ```json is missing
+        parts = llm_content.split("\n", 1)
+        if len(parts) > 1:
+            content_after_fence = parts[1]
+            if content_after_fence.endswith("```"):
+                json_content = content_after_fence[:-3].strip()
 
-    # Ask model to validate types
-    validation_messages: list[dict[str, Any]] = [
-        {"type": "text", "text": prompt_str + "\n\nGenerated JSON:\n" + json_content}
-    ]
-    validation_response = llm.invoke(
-        [HumanMessage(content=cast(Any, validation_messages))]
-    )
-    json_content = str(validation_response.content).strip()
-
-    # Strip markdown code fences again if present in validation response
-    if json_content.startswith("```"):
-        json_content = json_content.split("\n", 1)[1]
-    if json_content.endswith("```"):
-        json_content = json_content.rsplit("\n", 1)[0]
-    json_content = json_content.strip()
+    print("Extracted Workflow JSON:")
     print(json_content)
 
     # Persist JSON next to original JSON file
