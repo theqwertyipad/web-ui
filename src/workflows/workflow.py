@@ -33,7 +33,7 @@ FALLBACK_PROMPT = (
 
 
 class Workflow:
-    """Simple orchestrator that executes a list of workflow *steps* defined in a YAML file."""
+    """Simple orchestrator that executes a list of workflow *steps* defined in a JSON file."""
 
     def __init__(
         self,
@@ -59,7 +59,7 @@ class Workflow:
         self.json_path = Path(json_path)
         if not self.json_path.exists():
             raise FileNotFoundError(self.json_path)
-        
+
         self.data = json.load(self.json_path.open("r", encoding="utf-8"))
         self.name = self.data["name"]
         self.description = self.data["description"]
@@ -77,11 +77,11 @@ class Workflow:
         self.context: dict[str, Any] = {}
 
         self.steps: List[Dict[str, Any]] = self._load_steps_from_json()
-        self.inputs_def: Dict[str, Any] = {}  # No input schema in JSON recordings
+        self.inputs_def: Dict[str, Any] = self.data.get("input_schema", {})  # No input schema in JSON recordings
         self._input_model: type[BaseModel] = self._build_input_model()
 
     # ---------------------------------------------------------------------
-    # Unified config loader (YAML workflow or raw JSON event log)
+    # Unified config loader (JSON workflow or raw event log)
     # ---------------------------------------------------------------------
 
     def _load_steps_from_json(self) -> List[Dict[str, Any]]:
@@ -155,7 +155,7 @@ class Workflow:
         # Ensure LLM availability first – callers already checked for `fallback_to_agent`
         if self.llm is None:
             raise ValueError(
-                "Cannot fall back to agent: An 'llm' instance must be supplied for agent-based steps"
+                "Cannot fall back to agent: An 'llm' instanFalsece must be supplied for agent-based steps"
             )
 
         # Build failure details for the prompt -------------------------------
@@ -211,7 +211,7 @@ class Workflow:
 
         try:
             # Let Pydantic perform the heavy lifting – this covers both presence and
-            # type validation based on the YAML-derived model.
+            # type validation based on the JSON schema model.
             self._input_model(**inputs)
         except Exception as e:
             raise ValueError(f"Invalid workflow inputs: {e}") from e
@@ -379,10 +379,13 @@ class Workflow:
         return result
 
     async def run_async(self, inputs: dict[str, Any] | None = None) -> List[Any]:
-        """Asynchronously execute the workflow returning a list of results.
+        """Execute the workflow asynchronously.
 
         Args:
-                inputs: Dictionary of input values required by the workflow (defined in YAML).
+            inputs: Dictionary of input values required by the workflow (defined in JSON).
+
+        Returns:
+            The result of the final workflow step.
         """
         runtime_inputs = inputs or {}
         # 1. Validate inputs against definition
@@ -456,7 +459,7 @@ class Workflow:
         """Synchronously execute :py:meth:`run_async` with ``asyncio.run``.
 
         Args:
-                inputs: Dictionary of input values required by the workflow (defined in YAML).
+                inputs: Dictionary of input values required by the workflow (defined in JSON).
         """
         return asyncio.run(self.run_async(inputs=inputs))
 
@@ -472,7 +475,7 @@ class Workflow:
     def _build_input_model(self) -> type[BaseModel]:
         """Return a *pydantic* model matching the workflow's ``inputs`` section.
 
-        The YAML schema uses a very small subset of JSON-Schema – each property maps
+        The JSON schema uses a very small subset of JSON-Schema – each property maps
         to a primitive *type string* (``string``, ``number``, ``bool``).  We convert
         that to a dynamic Pydantic model so it can be plugged directly into
         ``StructuredTool`` as the ``args_schema``.
@@ -521,7 +524,7 @@ class Workflow:
         """
 
         InputModel = self._build_input_model()
-        tool_name = name or self.name
+        tool_name = name or self.name.replace(" ", "_")[:50]
         doc = description or f"Execute the workflow defined in {self.json_path.name}"
 
         # `self` is closed over via the inner function so we can keep state.
