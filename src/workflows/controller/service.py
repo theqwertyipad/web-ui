@@ -12,9 +12,11 @@ from .views import (
     ScrollDeterministicAction,
     SelectDropdownOptionDeterministicAction,
 )
+from .utlis import get_best_element_handle
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_ACTION_TIMEOUT_MS = 1000
 
 class WorkflowController(Controller):
     def __init__(self, *args, **kwargs):
@@ -36,24 +38,34 @@ class WorkflowController(Controller):
             return ActionResult(extracted_content=msg, include_in_memory=True)
 
         # Click element by CSS selector --------------------------------------------------
+
         @self.registry.action(
-            "Click element by selector", param_model=ClickElementDeterministicAction
+            "Click element by all available selectors", param_model=ClickElementDeterministicAction
         )
         async def click(
             params: ClickElementDeterministicAction, browser: BrowserContext
         ) -> ActionResult:
-            """Click the first element matching *params.cssSelector*."""
-            timeout_ms = 5000  # 5 seconds
+            """Click the first element matching *params.cssSelector* with fallback mechanisms."""
             page = await browser.get_current_page()
-            print(f"Clicking element with selector: {params.cssSelector}")
-            await page.click(params.cssSelector, timeout=timeout_ms, force=True)
-            msg = f"🖱️  Clicked element with CSS selector: {params.cssSelector}"
-            logger.info(msg)
-            return ActionResult(extracted_content=msg, include_in_memory=True)
+            original_selector = params.cssSelector
+
+            try:
+                locator, selector_used = await get_best_element_handle(
+                    page, params.cssSelector, params, timeout_ms=DEFAULT_ACTION_TIMEOUT_MS
+                )
+                await locator.click(force=True)
+
+                msg = f"🖱️  Clicked element with CSS selector: {selector_used} (original: {original_selector})"
+                logger.info(msg)
+                return ActionResult(extracted_content=msg, include_in_memory=True)
+            except Exception as e:
+                error_msg = f"Failed to click element. Original selector: {original_selector}. Error: {str(e)}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
 
         # Input text into element --------------------------------------------------------
         @self.registry.action(
-            "Input text into an element by CSS selector",
+            "Input text into an element by all available selectors",
             param_model=InputTextDeterministicAction,
         )
         async def input(
@@ -62,59 +74,90 @@ class WorkflowController(Controller):
             has_sensitive_data: bool = False,
         ) -> ActionResult:
             """Fill text into the element located with *params.cssSelector*."""
-            timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
-            print(f"Filling text into element with selector: {params.cssSelector}")
-            print("Params: ", params)
-            is_select = await page.locator(params.cssSelector).evaluate(
-                '(el) => el.tagName === "SELECT"'
-            )
-            if is_select:
-                # TODO: Not sure why there is an input event before a select event
-                return ActionResult(extracted_content="Ignored input into select element", include_in_memory=True)
-            else:
-                await page.fill(params.cssSelector, params.value, timeout=timeout_ms)
+            original_selector = params.cssSelector
 
-            msg = f'⌨️  Input "{params.value}" into element with CSS selector: {params.cssSelector}'
-            logger.info(msg)
-            return ActionResult(extracted_content=msg, include_in_memory=True)
+            try:
+                locator, selector_used = await get_best_element_handle(
+                    page,
+                    params.cssSelector,
+                    params,
+                    timeout_ms=DEFAULT_ACTION_TIMEOUT_MS,
+                )
+
+                # Check if it's a SELECT element
+                is_select = await locator.evaluate('(el) => el.tagName === "SELECT"')
+                if is_select:
+                    return ActionResult(
+                        extracted_content="Ignored input into select element",
+                        include_in_memory=True,
+                    )
+
+                await locator.fill(params.value)
+
+                msg = f'⌨️  Input "{params.value}" into element with CSS selector: {selector_used} (original: {original_selector})'
+                logger.info(msg)
+                return ActionResult(extracted_content=msg, include_in_memory=True)
+            except Exception as e:
+                error_msg = f"Failed to input text. Original selector: {original_selector}. Error: {str(e)}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
 
         # Select dropdown option ---------------------------------------------------------
         @self.registry.action(
-            "Select dropdown option by selector and visible text",
+            "Select dropdown option by all available selectors and visible text",
             param_model=SelectDropdownOptionDeterministicAction,
         )
         async def select_change(
             params: SelectDropdownOptionDeterministicAction, browser: BrowserContext
         ) -> ActionResult:
             """Select dropdown option whose visible text equals *params.value*."""
-            timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
-            print(f"Selecting option in dropdown with selector: {params.cssSelector}")
-            await page.select_option(
-                params.cssSelector, label=params.selectedText, timeout=timeout_ms
-            )
-            msg = f'Selected option "{params.selectedText}" in dropdown {params.cssSelector}'
-            logger.info(msg)
-            return ActionResult(extracted_content=msg, include_in_memory=True)
+            original_selector = params.cssSelector
+
+            try:
+                locator, selector_used = await get_best_element_handle(
+                    page,
+                    params.cssSelector,
+                    params,
+                    timeout_ms=DEFAULT_ACTION_TIMEOUT_MS,
+                )
+
+                await locator.select_option(label=params.selectedText)
+
+                msg = f'Selected option "{params.selectedText}" in dropdown {selector_used} (original: {original_selector})'
+                logger.info(msg)
+                return ActionResult(extracted_content=msg, include_in_memory=True)
+            except Exception as e:
+                error_msg = f"Failed to select option. Original selector: {original_selector}. Error: {str(e)}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
 
         # Key press action ------------------------------------------------------------
         @self.registry.action(
-            "Press key on element by selector", param_model=KeyPressDeterministicAction
+            "Press key on element by all available selectors", param_model=KeyPressDeterministicAction
         )
         async def key_press(
             params: KeyPressDeterministicAction, browser: BrowserContext
         ) -> ActionResult:
             """Press *params.key* on the element identified by *params.cssSelector*."""
-            timeout_ms = 5000  # 5 seconds
             page = await browser.get_current_page()
-            print(
-                f"Pressing key '{params.key}' on element with selector: {params.cssSelector}"
-            )
-            await page.press(params.cssSelector, params.key, timeout=timeout_ms)
-            msg = f"🔑  Pressed key '{params.key}' on element with CSS selector: {params.cssSelector}"
-            logger.info(msg)
-            return ActionResult(extracted_content=msg, include_in_memory=True)
+            original_selector = params.cssSelector
+
+            try:
+                locator, selector_used = await get_best_element_handle(
+                    page, params.cssSelector, params, timeout_ms=5000
+                )
+
+                await locator.press(params.key)
+
+                msg = f"🔑  Pressed key '{params.key}' on element with CSS selector: {selector_used} (original: {original_selector})"
+                logger.info(msg)
+                return ActionResult(extracted_content=msg, include_in_memory=True)
+            except Exception as e:
+                error_msg = f"Failed to press key. Original selector: {original_selector}. Error: {str(e)}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
 
         # Scroll action --------------------------------------------------------------
         @self.registry.action("Scroll page", param_model=ScrollDeterministicAction)
