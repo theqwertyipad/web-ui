@@ -253,10 +253,14 @@
 
   closeBtn.onclick = () => {
     // Remove event listeners
-    document.removeEventListener('keydown', keydownHandler);
-    document.keydownHandlerAttached = false;
-    document.removeEventListener('click', clickHandler);
+    document.removeEventListener('click', clickHandler, true);
     document.clickHandlerAttached = false;
+    document.removeEventListener('input', inputHandler, true);
+    document.inputHandlerAttached = false;
+    document.removeEventListener('change', changeHandler, true);
+    document.changeHandlerAttached = false;
+    document.removeEventListener('keydown', keydownHandler, true);
+    document.keydownHandlerAttached = false;
     window.removeEventListener('popstate', popstateHandler);
     window.popstateHandlerAttached = false;
     window.removeEventListener('load', loadHandler);
@@ -421,67 +425,264 @@
     historyList.appendChild(container);
   };
 
-  const keydownHandler = (e) => {
-    console.log('keydown event triggered');
+  //
+  // EVENT HANDLER SECTION WITH HELPER FUNCTIONS
+  //
 
-    if (e.key.length === 1) {
-      currentTypedText += e.key;
-    } else if (e.key === 'Backspace') {
-      currentTypedText = currentTypedText.slice(0, -1);
-    } else if (e.key === 'Enter' || e.key === 'Tab') {
-      if (currentTypedText) {
-        window.notifyPython?.('elementType', {
-          text: currentTypedText,
-          mode: 'enter',
-        });
-        currentTypedText = '';
+  const SAFE_ATTRIBUTES = new Set([
+    'id',
+    'name',
+    'type',
+    'placeholder',
+    'aria-label',
+    'aria-labelledby',
+    'aria-describedby',
+    'role',
+    'for',
+    'autocomplete',
+    'required',
+    'readonly',
+    'alt',
+    'title',
+    'src',
+    'href',
+    'target',
+    'data-id',
+    'data-qa',
+    'data-cy',
+    'data-testid',
+  ]);
+
+  function getXPath(element) {
+    if (element.id !== '') {
+      return `id("${element.id}")`;
+    }
+    if (element === document.body) {
+      return element.tagName.toLowerCase();
+    }
+    let ix = 0;
+    const siblings = element.parentNode?.children;
+    if (siblings) {
+      for (let i = 0; i < siblings.length; i++) {
+        const sibling = siblings[i];
+        if (sibling === element) {
+          return `${getXPath(
+            element.parentElement
+          )}/${element.tagName.toLowerCase()}[${ix + 1}]`;
+        }
+        if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+          ix++;
+        }
       }
     }
-  };
+    return element.tagName.toLowerCase();
+  }
+
+  function getEnhancedCSSSelector(element, xpath) {
+    try {
+      let cssSelector = element.tagName.toLowerCase();
+      if (element.classList && element.classList.length > 0) {
+        const validClassPattern = /^[a-zA-Z_][a-zA-Z0-9_-]*$/;
+        element.classList.forEach((className) => {
+          if (className && validClassPattern.test(className)) {
+            cssSelector += `.${CSS.escape(className)}`;
+          }
+        });
+      }
+      for (const attr of element.attributes) {
+        const attrName = attr.name;
+        const attrValue = attr.value;
+        if (attrName === 'class') continue;
+        if (!attrName.trim()) continue;
+        if (!SAFE_ATTRIBUTES.has(attrName)) continue;
+        const safeAttribute = CSS.escape(attrName);
+        if (attrValue === '') {
+          cssSelector += `[${safeAttribute}]`;
+        } else {
+          const safeValue = attrValue.replace(/"/g, '\\"');
+          if (/["'<>`\s]/.test(attrValue)) {
+            cssSelector += `[${safeAttribute}*="${safeValue}"]`;
+          } else {
+            cssSelector += `[${safeAttribute}="${safeValue}"]`;
+          }
+        }
+      }
+      return cssSelector;
+    } catch (error) {
+      console.error('Error generating enhanced CSS selector:', error);
+      return `${element.tagName.toLowerCase()}[xpath="${xpath.replace(
+        /"/g,
+        '\\"'
+      )}"]`;
+    }
+  }
+
+  // const keydownHandler = (e) => {
+  //   console.log('keydown event triggered');
+
+  //   if (e.key.length === 1) {
+  //     currentTypedText += e.key;
+  //   } else if (e.key === 'Backspace') {
+  //     currentTypedText = currentTypedText.slice(0, -1);
+  //   } else if (e.key === 'Enter' || e.key === 'Tab') {
+  //     if (currentTypedText) {
+  //       window.notifyPython?.('elementType', {
+  //         text: currentTypedText,
+  //         mode: 'enter',
+  //       });
+  //       currentTypedText = '';
+  //     }
+  //   }
+  // };
 
   const clickHandler = (event) => {
     console.log('click event triggered');
 
     // Check if the click is on the recorder UI
     if (overlay.contains(event.target)) return;
+    console.log('event');
 
-    if (currentTypedText) {
-      console.log('sending type-then-click');
-      window.notifyPython?.('elementType', {
-        text: currentTypedText,
-        mode: 'type-then-click',
-      });
-      currentTypedText = '';
+    const targetElement = event.target;
+    try {
+      const xpath = getXPath(targetElement);
+      const clickData = {
+        url: document.location.href,
+        frameUrl: window.location.href,
+        xpath: xpath,
+        cssSelector: getEnhancedCSSSelector(targetElement, xpath),
+        elementTag: targetElement.tagName,
+        elementText: targetElement.textContent?.trim().slice(0, 200) || '',
+      };
+      window.notifyPython?.('elementClick', clickData);
+    } catch (error) {
+      console.error('Error capturing click data:', error);
     }
+  };
 
-    const attributes = {};
-    for (let attr of event.target.attributes) {
-      attributes[attr.name] = attr.value;
+  const inputHandler = (event) => {
+    console.log('input event triggered');
+    const targetElement = event.target;
+    if (!targetElement || !('value' in targetElement)) return;
+    const isPassword = targetElement.type === 'password';
+    try {
+      const xpath = getXPath(targetElement);
+      const inputData = {
+        url: document.location.href,
+        frameUrl: window.location.href,
+        xpath: xpath,
+        cssSelector: getEnhancedCSSSelector(targetElement, xpath),
+        elementTag: targetElement.tagName,
+        value: isPassword ? '********' : targetElement.value,
+      };
+      window.notifyPython?.('elementInput', inputData);
+    } catch (error) {
+      console.error('Error capturing input data:', error);
     }
+  };
 
-    window.notifyPython?.('elementClick', { attributes });
+  const changeHandler = (event) => {
+    console.log('change event triggered');
+    const targetElement = event.target;
+    if (!targetElement || targetElement.tagName !== 'SELECT') return;
+    try {
+      const xpath = getXPath(targetElement);
+      const selectedOption = targetElement.options[targetElement.selectedIndex];
+      const selectData = {
+        url: document.location.href,
+        frameUrl: window.location.href,
+        xpath: xpath,
+        cssSelector: getEnhancedCSSSelector(targetElement, xpath),
+        elementTag: targetElement.tagName,
+        selectedValue: targetElement.value,
+        selectedText: selectedOption ? selectedOption.text : '',
+      };
+      window.notifyPython?.('elementChange', selectData);
+    } catch (error) {
+      console.error('Error capturing select change data:', error);
+    }
+  };
+
+  const CAPTURED_KEYS = new Set([
+    'Enter',
+    'Tab',
+    'Escape',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+    'Home',
+    'End',
+    'PageUp',
+    'PageDown',
+    'Backspace',
+    'Delete',
+  ]);
+
+  const keydownHandler = (event) => {
+    console.log('keydown event triggered');
+    const key = event.key;
+    let keyToLog = '';
+    if (CAPTURED_KEYS.has(key)) {
+      keyToLog = key;
+    } else if (
+      (event.ctrlKey || event.metaKey) &&
+      key.length === 1 &&
+      /[a-zA-Z0-9]/.test(key)
+    ) {
+      keyToLog = `CmdOrCtrl+${key.toUpperCase()}`;
+    }
+    if (keyToLog) {
+      const targetElement = event.target;
+      let xpath = '';
+      let cssSelector = '';
+      let elementTag = 'document';
+      if (targetElement && typeof targetElement.tagName === 'string') {
+        try {
+          xpath = getXPath(targetElement);
+          cssSelector = getEnhancedCSSSelector(targetElement, xpath);
+          elementTag = targetElement.tagName;
+        } catch (e) {
+          console.error('Error getting selector for keydown target:', e);
+        }
+      }
+      try {
+        const keyData = {
+          url: document.location.href,
+          frameUrl: window.location.href,
+          key: keyToLog,
+          xpath: xpath,
+          cssSelector: cssSelector,
+          elementTag: elementTag,
+        };
+        window.notifyPython?.('keydownEvent', keyData);
+      } catch (error) {
+        console.error('Error capturing keydown data:', error);
+      }
+    }
   };
 
   const popstateHandler = () => {
     console.log('popstate event triggered');
-    window.notifyPython?.('navigate', { url: window.location.href });
+    window.notifyPython?.('navigation', { url: window.location.href });
   };
 
   const loadHandler = () => {
     console.log('load event triggered');
-    window.notifyPython?.('navigate', { url: window.location.href });
+    window.notifyPython?.('navigation', { url: window.location.href });
   };
 
-  // Attach event listeners when the script first executes
-  document.addEventListener('keydown', keydownHandler);
-  document.keydownHandlerAttached = true;
-
-  document.addEventListener('click', clickHandler);
+  // Attach event listeners
+  document.addEventListener('click', clickHandler, true);
   document.clickHandlerAttached = true;
+  document.addEventListener('input', inputHandler, true);
+  document.inputHandlerAttached = true;
+  document.addEventListener('change', changeHandler, true);
+  document.changeHandlerAttached = true;
+  document.addEventListener('keydown', keydownHandler, true);
+  document.keydownHandlerAttached = true;
 
   window.addEventListener('popstate', popstateHandler);
   window.popstateHandlerAttached = true;
-
   window.addEventListener('load', loadHandler);
   window.loadHandlerAttached = true;
 
@@ -489,22 +690,25 @@
     refreshListeners: () => {
       console.log('Reattaching event listeners if not already attached');
 
-      // Check and attach keydown event listener
-      if (document.keydownHandlerAttached) {
-        console.log('keydown event listener already attached');
-      } else {
-        console.log('attaching keydown event listener');
-        document.addEventListener('keydown', keydownHandler);
-        document.keydownHandlerAttached = true;
-      }
-
-      // Check and attach click event listener
-      if (document.clickHandlerAttached) {
-        console.log('click event listener already attached');
-      } else {
+      if (!document.clickHandlerAttached) {
         console.log('attaching click event listener');
-        document.addEventListener('click', clickHandler);
+        document.addEventListener('click', clickHandler, true);
         document.clickHandlerAttached = true;
+      }
+      if (!document.inputHandlerAttached) {
+        console.log('attaching input event listener');
+        document.addEventListener('input', inputHandler, true);
+        document.inputHandlerAttached = true;
+      }
+      if (!document.changeHandlerAttached) {
+        console.log('attaching change event listener');
+        document.addEventListener('change', changeHandler, true);
+        document.changeHandlerAttached = true;
+      }
+      if (!document.keydownHandlerAttached) {
+        console.log('attaching keydown event listener');
+        document.addEventListener('keydown', keydownHandler, true);
+        document.keydownHandlerAttached = true;
       }
 
       // Check and attach popstate event listener
