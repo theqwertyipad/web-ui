@@ -45,4 +45,4 @@ Multi Selector:
 
 
 
- Now I want to do something very involved. I want acutlaly to remove the need of an Adapter and have the workflow be a superset of the JSON format. Can you adapt @workflow.py so that instead of reading YAMLS it reads the output JSON as is ? Now that we gave the actions the same name as they are in the JSON this should work pretty easily.
+- [] There is a bunch of navigations tha happens before the first user interaction, for now I hack this away. Also the input actions are not debounced but they probably should

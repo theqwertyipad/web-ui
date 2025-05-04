@@ -5,7 +5,7 @@ import json
 import json as _json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from browser_use.agent.service import Agent
 from browser_use.agent.views import ActionResult, AgentHistoryList
@@ -17,7 +17,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, create_model
 
-from controller.service import WorkflowController
+from .controller.service import WorkflowController
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,26 @@ class Workflow:
         llm: BaseChatModel | None = None,
         fallback_to_agent: bool = True,
     ) -> None:
+        """Initialize a new Workflow instance.
+
+        Args:
+            json_path: Path to the JSON file containing workflow steps or recorded events
+            controller: Optional WorkflowController instance to handle action execution
+            browser: Optional Browser instance to use for browser automation
+            llm: Optional language model for fallback agent functionality
+            fallback_to_agent: Whether to fall back to agent-based execution on step failure
+
+        Raises:
+            FileNotFoundError: If the specified json_path does not exist
+        """
         self.json_path = Path(json_path)
         if not self.json_path.exists():
             raise FileNotFoundError(self.json_path)
+        
+        self.data = json.load(self.json_path.open("r", encoding="utf-8"))
+        self.name = self.data["name"]
+        self.description = self.data["description"]
+        self.version = self.data["version"]
 
         self.controller = controller or WorkflowController()
         self.browser = browser or Browser()
@@ -70,18 +87,8 @@ class Workflow:
     def _load_steps_from_json(self) -> List[Dict[str, Any]]:
         """Load recorder events from JSON and map to workflow steps."""
 
-        with self.json_path.open("r", encoding="utf-8") as fp:
-            raw = json.load(fp)
-
-        if isinstance(raw, dict) and "events" in raw:
-            events = raw["events"]
-        else:
-            events = raw
-
-        debounced_events = self._debounce_input_events(events) 
-
         steps: List[Dict[str, Any]] = []
-        for evt in debounced_events:
+        for evt in self.data["steps"]:
             if evt.get("screenshot"):
                 evt["screenshot"] = ""
             steps.append(
@@ -514,7 +521,7 @@ class Workflow:
         """
 
         InputModel = self._build_input_model()
-        tool_name = name or f"{self.json_path.stem}_workflow"
+        tool_name = name or self.name
         doc = description or f"Execute the workflow defined in {self.json_path.name}"
 
         # `self` is closed over via the inner function so we can keep state.
@@ -559,45 +566,3 @@ class Workflow:
         agent_executor = AgentExecutor(agent=agent, tools=[workflow_tool])
         result = await agent_executor.ainvoke({"input": input})
         return result["output"]
-
-    # ------------------------------------------------------------------
-    # Event helpers
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _debounce_input_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Collapse successive *input* events on the same element.
-
-        Many recorders emit a new *input* event on every keystroke so typing
-        "hello" becomes five events with values "h", "he", "hel", … We keep only
-        the *last* event of each consecutive run on the same element.
-        """
-        debounced: List[Dict[str, Any]] = []
-        pending_input: Optional[Dict[str, Any]] = None
-
-        def _flush_pending():
-            nonlocal pending_input
-            if pending_input is not None:
-                debounced.append(pending_input)
-                pending_input = None
-
-        for evt in events:
-            if evt.get("type") == "input":
-                selector_key = evt.get("cssSelector") or evt.get("xpath") or ""
-                if (
-                    pending_input
-                    and (pending_input.get("cssSelector") or pending_input.get("xpath"))
-                    == selector_key
-                ):
-                    # Same element – keep the newer (more complete) value
-                    pending_input = evt
-                else:
-                    # New element – flush previous and start new pending
-                    _flush_pending()
-                    pending_input = evt
-            else:
-                _flush_pending()
-                debounced.append(evt)
-
-        _flush_pending()
-        return debounced

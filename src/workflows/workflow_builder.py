@@ -8,13 +8,17 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import PromptTemplate
 
-from controller.service import WorkflowController
-from prompts import workflow_builder_template
-from workflow import Workflow
-
+from .controller.service import WorkflowController
+from .prompts import workflow_builder_template
+from .workflow import Workflow
+from . import WORKFLOW_VERSION
 
 logger = logging.getLogger(__name__)
 
+
+# -----------------------------------------------------------------------------
+# Prompt helpers
+# -----------------------------------------------------------------------------
 
 def _available_actions_markdown() -> str:
     """Return a bullet list with available deterministic actions and their descriptions."""
@@ -42,11 +46,6 @@ def _prune_event(event: dict) -> dict:
         event["data"] = event["data"].copy()
         event["data"].pop("screenshot", None)
     return event
-
-
-# -----------------------------------------------------------------------------
-# Prompt helpers
-# -----------------------------------------------------------------------------
 
 
 def _event_to_messages(event: dict, include_screenshot: bool) -> list[dict[str, Any]]:
@@ -129,6 +128,64 @@ def _prepare_event_messages(
     return messages
 
 
+def _debounce_input_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse successive *input* events on the same element.
+
+    Many recorders emit a new *input* event on every keystroke so typing
+    "hello" becomes five events with values "h", "he", "hel", … We keep only
+    the *last* event of each consecutive run on the same element.
+    """
+    debounced: list[dict[str, Any]] = []
+    pending_input: dict[str, Any] | None = None
+
+    def _flush_pending():
+        nonlocal pending_input
+        if pending_input is not None:
+            debounced.append(pending_input)
+            pending_input = None
+
+    for evt in events:
+        if evt.get("type") == "input":
+            selector_key = evt.get("cssSelector") or evt.get("xpath") or ""
+            if (
+                pending_input
+                and (pending_input.get("cssSelector") or pending_input.get("xpath"))
+                == selector_key
+            ):
+                # Same element – keep the newer (more complete) value
+                pending_input = evt
+            else:
+                # New element – flush previous and start new pending
+                _flush_pending()
+                pending_input = evt
+        else:
+            _flush_pending()
+            debounced.append(evt)
+
+    _flush_pending()
+    return debounced
+
+def prune_screenshots(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Prune screenshots from the events."""
+    for evt in events:
+        if evt.get("screenshot"):
+            evt["screenshot"] = ""
+    return events
+
+
+def find_first_user_interaction_url(events: list[dict[str, Any]]) -> str | None:
+    """Find the first user interaction in the events."""
+    return next(
+        (
+            evt.get("frameUrl")
+            for evt in events
+            if evt.get("type") in ["input", "click", "scroll"]
+        ),
+        None,
+    )
+
+
+
 # -----------------------------------------------------------------------------
 # Public API
 # -----------------------------------------------------------------------------
@@ -137,6 +194,51 @@ def _prepare_event_messages(
 # therefore disabled by default and can be enabled explicitly via the
 # *use_screenshots* parameter or the CLI flag ``--use-screenshots``.
 
+def save_clean_recording(recording_path:str, out_path:str) -> None:
+    """This function clean up the recording by making it nicer to work with by the workflow."""
+    with open(recording_path, "r") as f:
+        recording = json.load(f)
+
+    # Remove screenshots
+    recording = prune_screenshots(recording)
+
+    # Debounce input events
+    recording = _debounce_input_events(recording)
+
+    # Find the first user interaction url
+    first_user_interaction_url = find_first_user_interaction_url(recording)
+    print(f"first_user_interaction_url: {first_user_interaction_url}")  
+    # We remove all the initial navigation until the first user interaction
+    for idx, evt in enumerate(recording):
+        if evt.get("frameUrl") == first_user_interaction_url:
+            break
+        print(f"popping {idx, evt} {evt.get('frameUrl')}")
+        recording.pop(idx)
+    print(f"recording: {recording}")
+        
+    # We append a navigaton event to the url at the beginning of the recording
+    recording.insert(0, {
+        "type": "navigation",
+        "url": first_user_interaction_url,
+        "timestamp": recording[0].get("timestamp"),
+        "tabId": recording[0].get("tabId"),
+    })
+
+    # Wrap events in a steps array
+    recording_dict = {
+        "steps": recording,
+        "name": recording_path.split(".")[0],
+        "description": "",
+        "version": WORKFLOW_VERSION,
+        "input_schema": {
+            "type": "object", 
+            "properties": {}
+        }
+    }
+    recording = recording_dict
+    # Return the cleaned recording
+    with open(out_path, "w") as f:
+        json.dump(recording, f)
 
 def parse_session(
     session_path: str,
