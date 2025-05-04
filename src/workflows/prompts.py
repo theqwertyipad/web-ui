@@ -29,6 +29,7 @@ Follow these rules when generating the output JSON:
      value of ``\"type\"`` MUST match **exactly** one of the available action
      names listed below; all additional keys are interpreted as parameters for
      that action.
+   • For each step you create also add a description that describes what the step tries to achieve.  
 3. When referencing workflow inputs inside event parameters or agent tasks use
    the placeholder syntax ``{{input_name}}`` (e.g. \"cssSelector\": \"#msg-{{row}}\")
    – do *not* use any prefix like \"input.\". Decide the inputs dynamically based on the user's
