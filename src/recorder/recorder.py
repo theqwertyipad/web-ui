@@ -20,22 +20,20 @@ class WorkflowStep:
 	url: str
 	timestamp: int = 0
 
-
 class WorkflowRecorder:
-	def __init__(self):
-		self.output_dir = ''
-		self.steps: List[WorkflowStep] = []
-		self.recording = False
-		self.typed_text = ''
+	def __init__(self, browser_config: Optional[BrowserConfig] = None):
+		self.browser_config = browser_config
 		self.js_overlay = resources.read_text('src.recorder', 'gui.js')
+		self.steps: List[WorkflowStep] = []
 		self._overlay_logs: List[str] = []
 		self._active_input: Optional[dict] = None
-		self._validated_elements = {}
 		self._recording_complete = asyncio.Event()
+		self.recording = False
 		self._should_exit = False
+		self._workflow_saved = False
+		self.output_dir = ''
 		self.description = ''
 		self.action_name = ''
-		self._workflow_saved = False
 		self.current_url = ''
 
 	async def update_state(self, context, page):
@@ -102,24 +100,21 @@ class WorkflowRecorder:
 			await asyncio.sleep(delay)
 		print('[❌] Failed to expose notifyPython after maximum attempts')
 
-	async def record_workflow(self, url: str):
+	async def record_workflow(self, url: str, context_config: Optional[BrowserContextConfig] = None):
 		"""Record a workflow by following user clicks and keyboard input"""
-		browser = Browser(
-			# config=BrowserConfig(browser_binary_path='C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'),
-		)
-
-		context_config = BrowserContextConfig(
-			highlight_elements=True,
-			viewport_expansion=500,
-			minimum_wait_page_load_time=1.0,
-			wait_for_network_idle_page_load_time=2.0,
-			maximum_wait_page_load_time=30.0,
-			disable_security=True,
-		)
+		browser = Browser(config=self.browser_config or BrowserConfig())
 
 		context = None
 		try:
-			context = await browser.new_context(config=context_config)
+			merged_config = context_config or BrowserContextConfig(
+				highlight_elements=True,
+				viewport_expansion=500,
+				minimum_wait_page_load_time=1.0,
+				wait_for_network_idle_page_load_time=2.0,
+				maximum_wait_page_load_time=30.0,
+				disable_security=True,
+			)
+			context = await browser.new_context(config=merged_config)
 			page = await context.get_current_page()
 			page.set_default_navigation_timeout(10000)
 			await page.evaluate(self.js_overlay, self.recording)
@@ -171,7 +166,6 @@ class WorkflowRecorder:
 							)
 							self.steps.append(step)
 							self.current_url = new_url
-
 			page.on('framenavigated', handle_navigation)
 
 			await asyncio.sleep(1)
@@ -355,6 +349,12 @@ class WorkflowRecorder:
 
 			self._notify_python = notify_python
 			await self.expose_notify_python(page)
+
+			def handle_browser_close(page):
+				print('Browser closed by user.')
+				self._should_exit = True
+				self._recording_complete.set()
+			page.on('close', handle_browser_close)
 
 			await self._recording_complete.wait()
 
