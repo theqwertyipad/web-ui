@@ -1,0 +1,101 @@
+{
+  "name": "Create GitHub Issue",
+  "description": "Automatically create a GitHub issue given the URL to the repository, the issue title, and the description.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "repo_url": {"type": "string"},
+      "issue_title": {"type": "string"},
+      "issue_description": {"type": "string"}
+    },
+    "required": ["repo_url", "issue_title", "issue_description"]
+  },
+  "steps": [
+    {
+      "type": "navigation",
+      "timestamp": 1746354879686,
+      "tabId": 1409140741,
+      "url": "{repo_url}"
+    },
+    {
+      "type": "click",
+      "timestamp": 1746354882556,
+      "tabId": 1409140741,
+      "cssSelector": "span",
+      "xpath": "id(\"issues-tab\")/span[1]",
+      "elementTag": "SPAN",
+      "elementText": "Issues"
+    },
+    {
+      "type": "click",
+      "timestamp": 1746354886904,
+      "tabId": 1409140741,
+      "cssSelector": "span.prc-Button-Label-pTQ3x",
+      "xpath": "id(\"repo-content-turbo-frame\")/react-app[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[2]/div[2]/div[1]/div[1]/div[2]/a[3]/span[1]/span[1]",
+      "elementTag": "SPAN",
+      "elementText": "New issue"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746354889726,
+      "tabId": 1409140741,
+      "cssSelector": "input.prc-components-Input-Ic-y8.focus-visible[type=\"text\"][aria-label*=\"Add a title\"][placeholder=\"Title\"][id=\":r2c:\"]",
+      "xpath": "id(\":r2c:\")",
+      "elementTag": "INPUT",
+      "value": "{issue_title}"
+    },
+    {
+      "type": "key_press",
+      "timestamp": 1746354891150,
+      "tabId": 1409140741,
+      "cssSelector": "input.prc-components-Input-Ic-y8.focus-visible[type=\"text\"][aria-label*=\"Add a title\"][placeholder=\"Title\"][id=\":r2c:\"]",
+      "xpath": "id(\":r2c:\")",
+      "elementTag": "INPUT",
+      "key": "Tab"
+    },
+    {
+      "type": "key_press",
+      "timestamp": 1746354891754,
+      "tabId": 1409140741,
+      "cssSelector": "button.TabNav__TabNavLink-sc-pwdi4r-3.fOlIdb.ViewSwitch-module__tabNavLink--AZkCL.ViewSwitch-module__editColor--UxQhv.TabNav-item.selected.focus-visible[role=\"tab\"]",
+      "xpath": "id(\"repo-content-turbo-frame\")/react-app[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/slash-command-expander[1]/fieldset[1]/div[2]/div[1]/header[1]/div[1]/div[1]/div[1]/nav[1]/div[1]/button[1]",
+      "elementTag": "BUTTON",
+      "key": "Tab"
+    },
+    {
+      "type": "key_press",
+      "timestamp": 1746354892316,
+      "tabId": 1409140741,
+      "cssSelector": "button.prc-Button-ButtonBase-c50BI.ToolbarButton-module__iconButton--fTMrr.prc-Button-IconButton-szpyj.focus-visible[type=\"button\"][aria-describedby=\":r2j:-loading-announcement\"][aria-labelledby=\":r2i:\"]",
+      "xpath": "id(\"repo-content-turbo-frame\")/react-app[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/slash-command-expander[1]/fieldset[1]/div[2]/div[1]/header[1]/div[2]/div[1]/button[1]",
+      "elementTag": "BUTTON",
+      "key": "Tab"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746354896020,
+      "tabId": 1409140741,
+      "cssSelector": "textarea.prc-Textarea-TextArea-13q4j.MarkdownInput-module__textArea--QjIwG.focus-visible[id=\":r2h:\"][placeholder*=\"Type your description here\u2026\"][aria-label*=\"Markdown value\"][aria-describedby=\":r2h:-description\"]",
+      "xpath": "id(\":r2h:\")",
+      "elementTag": "TEXTAREA",
+      "value": "{issue_description}"
+    },
+    {
+      "type": "click",
+      "timestamp": 1746354897847,
+      "tabId": 1409140741,
+      "cssSelector": "span.prc-Button-ButtonContent-HKbr-",
+      "xpath": "id(\"repo-content-turbo-frame\")/react-app[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[3]/div[1]/div[2]/div[2]/button[2]/span[1]",
+      "elementTag": "SPAN",
+      "elementText": "Create( control\u2303 enter\u23ce)"
+    },
+    {
+      "type": "done",
+      "properties": {
+        "text": "GitHub issue created successfully.",
+        "success": true
+      }
+    }
+  ],
+  "version": "1.0"
+}
