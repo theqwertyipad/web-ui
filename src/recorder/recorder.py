@@ -16,9 +16,16 @@ from src.utils import utils
 class WorkflowStep:
 	step_number: int
 	type: str
-	clicked_element: dict
+	timestamp: int
 	url: str
-	timestamp: int = 0
+	def __init__(self, step_number: int, type: str, url: str, timestamp: int = 0, **kwargs):
+		self.step_number = step_number
+		self.type = type
+		self.url = url
+		self.timestamp = timestamp
+		# Store additional attributes
+		for key, value in kwargs.items():
+			setattr(self, key, value)
 
 class WorkflowRecorder:
 	def __init__(self, browser_config: Optional[BrowserConfig] = None):
@@ -92,11 +99,28 @@ class WorkflowRecorder:
 				is_exposed = await page.evaluate('typeof window.notifyPython === "function"')
 				if is_exposed:
 					print('[✅] notifyPython is callable from the page')
-					return
+					# Set up a future to capture the mock call
+					self._mock_future = asyncio.Future()
+					for mock_attempt in range(max_attempts):
+						try:
+							await page.evaluate('window.notifyPython("mock_test", {})')
+							await asyncio.wait_for(self._mock_future, timeout=1.0)
+							print('[✅] Mock call successfully received')
+							return
+						except Exception as mock_err:
+							print(f'[⚠️] Mock call attempt {mock_attempt + 1} failed: {mock_err}')
+							await page.reload()
+							print('[🔄] Page reloaded, retrying the process...')
+							await asyncio.sleep(delay)
+					print('[❌] Failed to receive mock call after maximum attempts')
+					continue
 				else:
 					print('[⚠️] notifyPython is not callable, retrying...')
 			except Exception as expose_err:
-				print(f'[⚠️] Attempt {attempt + 1} failed: {expose_err}')
+				if 'has been already registered' in str(expose_err):
+					return
+				else:
+					print(f'[⚠️] Attempt {attempt + 1} failed: {expose_err}')
 			await asyncio.sleep(delay)
 		print('[❌] Failed to expose notifyPython after maximum attempts')
 
@@ -160,7 +184,6 @@ class WorkflowRecorder:
 							step = WorkflowStep(
 								step_number=len(self.steps) + 1,
 								type='navigation',
-								clicked_element={},
 								url=new_url,
 								timestamp=int(datetime.datetime.now().timestamp() * 1000)
 							)
@@ -181,9 +204,14 @@ class WorkflowRecorder:
 			async def notify_python(event_type, payload):
 				page = await context.get_current_page()
 				# 🔓 Allow control and submitOverlayInput events always
-				if event_type not in ['control', 'submitOverlayInput'] and not self.recording:
+				if event_type not in ['control', 'submitOverlayInput', 'mock_test'] and not self.recording:
 					await self.overlay_print(f"⚠️ Received '{event_type}' while not recording — ignoring.", page)
 					return
+				# Handle mock_test for connection verification
+				if event_type == 'mock_test':
+					if hasattr(self, '_mock_future') and not self._mock_future.done():
+						self._mock_future.set_result(True)
+						return
 
 				if event_type == 'submitOverlayInput':
 					if hasattr(self, '_input_future') and not self._input_future.done():
@@ -200,9 +228,9 @@ class WorkflowRecorder:
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
 						type='click',
-						clicked_element=attributes,
 						url=payload.get('url', ''),
-						timestamp=int(datetime.datetime.now().timestamp() * 1000)
+						timestamp=int(datetime.datetime.now().timestamp() * 1000),
+						**attributes
 					)
 					self.steps.append(step)
 					await page.evaluate(
@@ -223,16 +251,16 @@ class WorkflowRecorder:
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
 						type='input',
-						clicked_element=attributes,
 						url=payload.get('url', ''),
-						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000))
+						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000)),
+						**attributes
 					)
 					self.steps.append(step)
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
 						step.type,
 					)
-					await self.overlay_print(f"⌨️ Recorded {type} into", page)
+					await self.overlay_print(f"⌨️ Recorded {getattr(step, 'elementTag', 'unknown element')} into", page)
 					await self.update_state(context, page)
 				elif event_type == 'elementChange':
 					attributes = {
@@ -246,16 +274,16 @@ class WorkflowRecorder:
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
 						type='select_change',
-						clicked_element=attributes,
 						url=payload.get('url', ''),
-						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000))
+						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000)),
+						**attributes
 					)
 					self.steps.append(step)
 					await page.evaluate(
 						'(action) => AgentRecorder.addWorkflowStep(action)',
 						step.type,
 					)
-					await self.overlay_print(f'🔽 Recorded select change', page)
+					await self.overlay_print(f'☑️ Recorded a selection', page)
 					await self.update_state(context, page)
 				elif event_type == 'keydownEvent':
 					attributes = {
@@ -268,9 +296,9 @@ class WorkflowRecorder:
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
 						type='key_press',
-						clicked_element=attributes,
-						url=page.url,
-						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000))
+						url=payload.get('url', ''),
+						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000)),
+						**attributes
 					)
 					self.steps.append(step)
 					await page.evaluate(
@@ -285,7 +313,6 @@ class WorkflowRecorder:
 					step = WorkflowStep(
 						step_number=len(self.steps) + 1,
 						type='navigation',
-						clicked_element={},
 						url=url,
 						timestamp=int(datetime.datetime.now().timestamp() * 1000)
 					)
@@ -305,13 +332,16 @@ class WorkflowRecorder:
 						await self.overlay_print('🟢 Recording started.', page)
 						# Setting as first step the URL
 						step = WorkflowStep(
-							step_number=len(self.steps) + 1,
+							step_number=0,
 							type='navigation',
-							clicked_element={},
 							url=page.url,
 							timestamp=int(datetime.datetime.now().timestamp() * 1000)
 						)
 						self.steps.append(step)
+						await page.evaluate(
+							'(action) => AgentRecorder.addWorkflowStep(action)',
+							step.type,
+						)
 					elif action == 'finish':
 						await self.set_recording_state(page, False)
 						self._active_input = None  # This can cause problems in the future
@@ -415,13 +445,7 @@ class WorkflowRecorder:
 				'description': self.description,
 				'steps': [
 					{
-						'step_number': step.step_number,
-						'type': step.type,
-						'timestamp': step.timestamp,
-						'clicked_element': {
-							**step.clicked_element,
-						},
-						'url': step.url,
+						**step.__dict__,
 					}
 					for step in self.steps
 				],
