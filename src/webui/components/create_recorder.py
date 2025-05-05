@@ -24,6 +24,7 @@ def create_recorder(webui_manager: WebuiManager):
     webui_manager.add_components("create_recorder", tab_components)
 
     async def run_recorder_with_url(url):
+        yield gr.update(value="Launching recorder...")
         browser_binary_path = (
             os.getenv("CHROME_PATH", None)
         )
@@ -40,9 +41,11 @@ def create_recorder(webui_manager: WebuiManager):
             await recorder.record_workflow(url)
         except Exception as e:
             print(f"An error occurred while recording the workflow: {e}")
+        finally:
+            yield gr.update(value="Run recorder")
 
     run_recorder.click(
         fn=run_recorder_with_url,
         inputs=[url_input],
-        outputs=[]
+        outputs=[run_recorder]
     )
