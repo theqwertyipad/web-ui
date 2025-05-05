@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import traceback
 import uuid
 from pathlib import Path
@@ -17,6 +18,23 @@ from src.workflows.workflow_builder import parse_session
 # Directory to store user workflows
 WORKFLOW_STORAGE_DIR = Path("./saved_workflows")
 WORKFLOW_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Set chrome path
+def get_executable_path() -> str:
+    """Get the path to the executable for the current OS."""
+    if sys.platform == "darwin":
+        # macOS path
+        return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    elif sys.platform.startswith("linux"):
+        # Linux path
+        return "/usr/bin/google-chrome"
+    elif sys.platform == "win32":
+        # Windows path
+        return "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    else:
+        raise ValueError(f"Unsupported platform: {sys.platform}")
+
+CHROME_PATH = get_executable_path()
 
 
 def _list_saved_workflows() -> list[str]:
@@ -511,7 +529,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # Execute workflow
         try:
             config = BrowserConfig(
-                browser_binary_path="/usr/bin/google-chrome",
+                browser_binary_path=CHROME_PATH,
                 headless=False,
             )
             browser = Browser(config=config)
@@ -558,7 +576,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # Execute workflow
         try:
             config = BrowserConfig(
-                browser_binary_path="/usr/bin/google-chrome",
+                browser_binary_path=CHROME_PATH,
                 headless=False,
             )
             browser = Browser(config=config)
