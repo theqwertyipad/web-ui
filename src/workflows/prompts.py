@@ -38,6 +38,8 @@ Follow these rules when generating the output JSON:
    strings.
 5. In the events you will find all the selectors relative to a particular action, replicate all of them in the workflow.
 
+Example of a workflow output:
+{example_workflow}
 
 High-level task description provided by the user (may be empty):
 {goal}

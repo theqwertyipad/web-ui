@@ -15,6 +15,9 @@ from .workflow import Workflow
 logger = logging.getLogger(__name__)
 
 
+EXAMPLE_WORKFLOW_PATH = Path(__file__).parent / "example.workflow.json"
+
+
 # -----------------------------------------------------------------------------
 # Prompt helpers
 # -----------------------------------------------------------------------------
@@ -199,6 +202,7 @@ def parse_session(
     prompt_str = prompt.format(
         actions=_available_actions_markdown(),
         events="Events will follow one-by-one in subsequent messages.",
+        example_workflow=EXAMPLE_WORKFLOW_PATH.read_text(),
         goal=user_goal,
     )
 
