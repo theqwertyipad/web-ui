@@ -1,0 +1,100 @@
+{
+  "name": "LinkedIn Message Automation",
+  "description": "Automatically send messages on LinkedIn given the person's name and the message.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "person_name": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string"
+      }
+    },
+    "required": ["person_name", "message"]
+  },
+  "steps": [
+    {
+      "type": "navigation",
+      "url": "https://www.linkedin.com/feed/",
+      "description": "Navigate to LinkedIn's homepage."
+    },
+    {
+      "type": "click",
+      "timestamp": 1746494325389,
+      "tabId": 1409141058,
+      "cssSelector": "a.eBOSiHffioaRqrowDPILgMQbHBQe.global-nav__primary-link[target=\"_self\"][href=\"https://www.linkedin.com/messaging/?\"]",
+      "xpath": "id(\"global-nav\")/div[1]/nav[1]/ul[1]/li[4]/a[1]",
+      "elementTag": "A",
+      "elementText": "Messaging",
+      "description": "Click on the Messaging link to navigate to the messaging section."
+    },
+    {
+      "type": "input",
+      "timestamp": 1746494332509,
+      "tabId": 1409141058,
+      "cssSelector": "input.ember-text-field.ember-view.msg-cross-pillar-search-form__search-field.t-14.t-black.t-normal[id=\"search-conversations\"][name=\"searchTerm\"][placeholder*=\"Search messages\"][autocomplete=\"off\"][type=\"search\"]",
+      "xpath": "id(\"search-conversations\")",
+      "elementTag": "INPUT",
+      "value": "{person_name}",
+      "description": "Search for the conversation with the specified person by name."
+    },
+    {
+      "type": "key_press",
+      "timestamp": 1746494333143,
+      "tabId": 1409141058,
+      "cssSelector": "input.ember-text-field.ember-view.msg-cross-pillar-search-form__search-field.t-14.t-black.t-normal[id=\"search-conversations\"][name=\"searchTerm\"][placeholder*=\"Search messages\"][autocomplete=\"off\"][type=\"search\"]",
+      "xpath": "id(\"search-conversations\")",
+      "elementTag": "INPUT",
+      "key": "Enter",
+      "description": "Press Enter to execute the search."
+    },
+    {
+      "type": "click",
+      "timestamp": 1746494335134,
+      "tabId": 1409141058,
+      "cssSelector": "div.msg-conversation-card__content--selectable",
+      "xpath": "id(\"conversation-card-ember785\")/div[1]/div[2]/div[2]",
+      "elementTag": "DIV",
+      "elementText": "Alberto Carpentieri\n                  \n                \n\n              \n              \n              \n                \n                  9:11 AM\n                \n                9:11 AM\n              ",
+      "description": "Select the conversation with the specified person."
+    },
+    {
+      "type": "click",
+      "timestamp": 1746494338114,
+      "tabId": 1409141058,
+      "cssSelector": "div.msg-form__contenteditable.t-14.t-black--light.t-normal.flex-grow-1.full-height.notranslate[role=\"textbox\"][aria-label*=\"Write a message\u2026\"]",
+      "xpath": "id(\"msg-form-ember799\")/div[3]/div[1]/div[1]/div[1]",
+      "elementTag": "DIV",
+      "elementText": "",
+      "description": "Click on the message input box to focus on it."
+    },
+    {
+      "type": "input",
+      "timestamp": 1746494341835,
+      "tabId": 1409141058,
+      "cssSelector": "div.msg-form__contenteditable.t-14.t-black--light.t-normal.flex-grow-1.full-height.notranslate[role=\"textbox\"][aria-label*=\"Write a message\u2026\"]",
+      "xpath": "id(\"msg-form-ember799\")/div[3]/div[1]/div[1]/div[1]",
+      "elementTag": "DIV",
+      "value": "{message}",
+      "description": "Input the message to be sent to the person."
+    },
+    {
+      "type": "click",
+      "timestamp": 1746494344033,
+      "tabId": 1409141058,
+      "cssSelector": "button.msg-form__send-button.artdeco-button.artdeco-button--1[type=\"submit\"]",
+      "xpath": "id(\"msg-form-ember799\")/footer[1]/div[2]/div[1]/button[1]",
+      "elementTag": "BUTTON",
+      "elementText": "Send",
+      "description": "Click the send button to send the message."
+    },
+    {
+      "type": "done",
+      "text": "Message sent successfully.",
+      "success": true,
+      "description": "Confirm that the message has been sent successfully."
+    }
+  ],
+  "version": "1.0"
+}

@@ -88,13 +88,6 @@
       "xpath": "id(\"repo-content-turbo-frame\")/react-app[1]/div[1]/div[1]/div[1]/div[2]/div[1]/div[1]/div[3]/div[1]/div[2]/div[2]/button[2]/span[1]",
       "elementTag": "SPAN",
       "elementText": "Create( control\u2303 enter\u23ce)"
-    },
-    {
-      "type": "done",
-      "properties": {
-        "text": "GitHub issue created successfully.",
-        "success": true
-      }
     }
   ],
   "version": "1.0"
