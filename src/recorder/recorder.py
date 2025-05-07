@@ -18,11 +18,13 @@ class WorkflowStep:
 	type: str
 	timestamp: int
 	url: str
-	def __init__(self, step_number: int, type: str, url: str, timestamp: int = 0, **kwargs):
+	cssSelector: Optional[str] = None
+	def __init__(self, step_number: int, type: str, url: str, timestamp: int = 0, cssSelector: Optional[str] = None, **kwargs):
 		self.step_number = step_number
 		self.type = type
 		self.url = url
 		self.timestamp = timestamp
+		self.cssSelector = cssSelector
 		# Store additional attributes
 		for key, value in kwargs.items():
 			setattr(self, key, value)
@@ -88,6 +90,14 @@ class WorkflowRecorder:
 			return await self._input_future
 		except asyncio.CancelledError:
 			return ''
+	
+	async def add_step(self, step: WorkflowStep, page):
+		self.steps.append(step)
+		selector = step.cssSelector if step.cssSelector else "no_selector"
+		await page.evaluate(
+			'(data) => AgentRecorder.addWorkflowStep(data.action, data.cssSelector)',
+			{"action": step.type, "cssSelector": selector}
+		)
 
 	async def expose_notify_python(self, page, max_attempts=2, delay=0.2):
 		"""Attempt to expose the notifyPython function with retries."""
@@ -167,10 +177,10 @@ class WorkflowRecorder:
 					await page.evaluate('(data) => AgentRecorder.requestInput(data)', self._active_input)
 				# Restore steps in the side panel
 				for step in self.steps:
-					action = step.type
+					selector = step.cssSelector if step.cssSelector else "no_selector"
 					await page.evaluate(
-						'(action) => AgentRecorder.addWorkflowStep(action)',
-						action,
+						'(data) => AgentRecorder.addWorkflowStep(data.action, data.cssSelector)',
+						{"action": step.type, "cssSelector": selector}
 					)
 			page.on('load', handle_page_load)
 
@@ -187,7 +197,7 @@ class WorkflowRecorder:
 								url=new_url,
 								timestamp=int(datetime.datetime.now().timestamp() * 1000)
 							)
-							self.steps.append(step)
+							await self.add_step(step, page)
 							self.current_url = new_url
 			page.on('framenavigated', handle_navigation)
 
@@ -232,11 +242,7 @@ class WorkflowRecorder:
 						timestamp=int(datetime.datetime.now().timestamp() * 1000),
 						**attributes
 					)
-					self.steps.append(step)
-					await page.evaluate(
-						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.type,
-					)
+					await self.add_step(step, page)
 					await self.overlay_print(f'🖱️ Recorded click', page)
 					await self.update_state(context, page)
 
@@ -255,11 +261,7 @@ class WorkflowRecorder:
 						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000)),
 						**attributes
 					)
-					self.steps.append(step)
-					await page.evaluate(
-						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.type,
-					)
+					await self.add_step(step, page)
 					await self.overlay_print(f"⌨️ Recorded {getattr(step, 'elementTag', 'unknown element')} into", page)
 					await self.update_state(context, page)
 				elif event_type == 'elementChange':
@@ -278,11 +280,7 @@ class WorkflowRecorder:
 						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000)),
 						**attributes
 					)
-					self.steps.append(step)
-					await page.evaluate(
-						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.type,
-					)
+					await self.add_step(step, page)
 					await self.overlay_print(f'☑️ Recorded a selection', page)
 					await self.update_state(context, page)
 				elif event_type == 'keydownEvent':
@@ -300,11 +298,7 @@ class WorkflowRecorder:
 						timestamp=payload.get('timestamp', int(datetime.datetime.now().timestamp() * 1000)),
 						**attributes
 					)
-					self.steps.append(step)
-					await page.evaluate(
-						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.type,
-					)
+					await self.add_step(step, page)
 					await self.overlay_print(f'⌨️ Recorded keydown: {payload.get("key", "")}', page)
 					await self.update_state(context, page)
 
@@ -316,12 +310,64 @@ class WorkflowRecorder:
 						url=url,
 						timestamp=int(datetime.datetime.now().timestamp() * 1000)
 					)
-					self.steps.append(step)
-					await page.evaluate(
-						'(action) => AgentRecorder.addWorkflowStep(action)',
-						step.type,
-					)
+					await self.add_step(step, page)
 					await self.overlay_print(f'🌐 Recorded navigation to {url}', page)
+					await self.update_state(context, page)
+				
+				elif event_type == 'deleteStep':
+					index = payload.get('index', '')
+					print(index)
+					if isinstance(index, int) and 0 <= index < len(self.steps):
+						removed_step = self.steps.pop(index)
+						await self.overlay_print(f'Deleted step {removed_step.step_number}: {removed_step.type}', page)
+						# Update step numbers for remaining steps
+						for idx, step in enumerate(self.steps):
+							step.step_number = idx + 1
+					else:
+						await self.overlay_print('⚠️ Invalid index for deletion', page)
+					await self.update_state(context, page)
+				
+				elif event_type == 'reorderSteps':
+					step_data = payload.get('step', {})
+					print(step_data)
+					if not step_data:
+						await self.overlay_print('⚠️ No step provided for reordering', page)
+						return
+
+					action = step_data.get('action', '')
+					css_selector = step_data.get('cssSelector', '')
+					original_index = step_data.get('originalIndex')
+					new_index = step_data.get('newIndex')
+
+					# Validate indices
+					if not isinstance(original_index, int) or not isinstance(new_index, int):
+						await self.overlay_print('⚠️ Invalid or missing indices for reordering', page)
+						return
+					if original_index < 0 or original_index >= len(self.steps) or new_index < 0 or new_index >= len(self.steps):
+						await self.overlay_print('⚠️ Index out of bounds for reordering', page)
+						return
+					if original_index == new_index:
+						await self.overlay_print('ℹ️ No change in step position', page)
+						return
+
+					# Validate the step at original_index matches action and cssSelector
+					moved_step = self.steps[original_index]
+					expected_key = (action, css_selector) if action.lower() != 'navigation' else (action,)
+					actual_key = (moved_step.type, moved_step.cssSelector) if moved_step.type.lower() != 'navigation' else (moved_step.type,)
+					if expected_key != actual_key:
+						await self.overlay_print(f'⚠️ Step at index {original_index} does not match provided action or selector', page)
+						return
+
+					# Move the step
+					self.steps.pop(original_index)
+					self.steps.insert(new_index, moved_step)
+					print(f'Moved step from index {original_index} to {new_index}')
+
+					# Update step_number for all steps
+					for idx, step in enumerate(self.steps):
+						step.step_number = idx + 1
+
+					await self.overlay_print(f'🔄 Moved step', page)
 					await self.update_state(context, page)
 
 				elif event_type == 'control':
@@ -337,11 +383,7 @@ class WorkflowRecorder:
 							url=page.url,
 							timestamp=int(datetime.datetime.now().timestamp() * 1000)
 						)
-						self.steps.append(step)
-						await page.evaluate(
-							'(action) => AgentRecorder.addWorkflowStep(action)',
-							step.type,
-						)
+						await self.add_step(step, page)
 					elif action == 'finish':
 						await self.set_recording_state(page, False)
 						self._active_input = None  # This can cause problems in the future
