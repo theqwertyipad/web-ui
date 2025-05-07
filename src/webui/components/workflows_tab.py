@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 import gradio as gr
 from browser_use.browser.browser import Browser, BrowserConfig
+from src.recorder.recorder import WorkflowRecorder
 from gradio.components import Component
 
 from src.utils import llm_provider
@@ -47,7 +48,7 @@ def _list_saved_workflows() -> list[str]:
 
 def create_workflows_tab(webui_manager: WebuiManager):
     """
-    Creates two tabs: one for creating workflows via recording + chat, and one for running saved workflows.
+    Creates three tabs: one for recording a session, one for creating a workflow from that session, and one for running saved workflows.
     """
     # expose module-level helper functions for callbacks
     global \
@@ -69,16 +70,39 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
     # Two main tabs: Create Workflow and Run Workflow
     with gr.Tabs():
+        # Recording Tab
+        with gr.TabItem("🔴 Run Recorder"):
+            with gr.Row():
+                # Column 1: Browser-based in-built recorder
+                with gr.Column():
+                    gr.Markdown("""
+                    #### Option 1: Use In-Built Browser Recorder
+                    Record your session directly in the browser using the in-built recorder:
+                    - Navigate to the website you want to record.
+                    - Use the in-built recorder to capture your actions.
+                    - Download the session as a JSON file.
+                    """)
+                    url_input = gr.Textbox(
+                        label="Website URL to begin the recording (default: browser-use.com)",
+                        placeholder="example.com"
+                    )
+                    run_recorder = gr.Button("Launch recorder", variant="primary")
+
+                # Column 2: Browser extension method (original content)
+                with gr.Column():
+                    gr.Markdown("""
+                    #### Option 2: Use Browser Extension
+                    Record your session using the browser extension:
+                    1. Install the browser extension (chrome://extensions/ → Developer mode → Load unpacked)
+                    2. Click the extension, record your session, and download the JSON file
+                    """)
+                    session_json_file = gr.File(
+                        label="Session JSON (.json)",
+                        file_types=[".json"],
+                        interactive=True
+                    )
         # Create Workflow Tab
         with gr.TabItem("🛠️ Create Workflow"):
-            gr.Markdown("""
-### Record and Generate a Workflow
-1. Install the browser extension (chrome://extensions/ → Developer mode → Load unpacked)
-2. Click the extension, record your session, and download the JSON file
-""")
-            session_json_file = gr.File(
-                label="Session JSON (.json)", file_types=[".json"], interactive=True
-            )
             gr.Markdown("#### Chat to generate workflow from recording")
             workflow_chat = gr.Chatbot(label="Workflow Chat")
             chat_input = gr.Textbox(
@@ -146,6 +170,8 @@ def create_workflows_tab(webui_manager: WebuiManager):
 
     # Register components for this tab
     workflow_tab_components = {
+        "run_recorder": run_recorder,
+        "url_input": url_input,
         "session_json_file": session_json_file,
         "use_vision_cb": use_vision_cb,
         "workflow_chat": workflow_chat,
@@ -466,6 +492,28 @@ def create_workflows_tab(webui_manager: WebuiManager):
     # Tab-specific wrapper functions
     # ------------------------------------------------------------------
 
+    # Launch recorder
+    async def run_recorder_with_url(url):
+        yield gr.update(value="Launching recorder...")
+        browser_binary_path = (
+            os.getenv("CHROME_PATH", None)
+        )
+        config=BrowserConfig(
+            browser_binary_path=browser_binary_path,
+        )
+        recorder = WorkflowRecorder(config)
+        url = url.strip()
+        if not url:
+            url = 'https://www.browser-use.com/'
+        elif not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        try:
+            await recorder.record_workflow(url)
+        except Exception as e:
+            print(f"An error occurred while recording the workflow: {e}")
+        finally:
+            yield gr.update(value="Run recorder")
+
     async def _run_generated_workflow_as_tool(components_dict: Dict[Component, Any]):
         """Run workflow as a tool from generated JSON."""
         wf_text = components_dict.get(generated_json)
@@ -689,6 +737,13 @@ def create_workflows_tab(webui_manager: WebuiManager):
             return chat_history, gr.update(value="")
 
     # --- ALL CALLBACKS MOVED HERE --- #
+    # Recording Tab Callbacks
+    run_recorder.click(
+        fn=run_recorder_with_url,
+        inputs=[url_input],
+        outputs=[run_recorder]
+    )
+
     # Create Workflow Tab Callbacks
     chat_button.click(
         fn=_generate_via_chat,
