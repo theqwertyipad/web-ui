@@ -7,6 +7,7 @@ import requests
 import json
 import gradio as gr
 import uuid
+from typing import Union
 
 
 def encode_image(img_path):

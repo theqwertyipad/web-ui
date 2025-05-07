@@ -1,0 +1,345 @@
+{
+  "name": "AutoFillFormWorkflow",
+  "description": "A workflow to automatically fill out a form with user-provided inputs.",
+  "version": "1.0.0",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "title": {"type": "string"},
+      "firstName": {"type": "string"},
+      "middleInitial": {"type": "string"},
+      "lastName": {"type": "string"},
+      "fullName": {"type": "string"},
+      "company": {"type": "string"},
+      "position": {"type": "string"},
+      "address1": {"type": "string"},
+      "address2": {"type": "string"},
+      "city": {"type": "string"},
+      "state": {"type": "string"},
+      "country": {"type": "string"},
+      "zip": {"type": "string"},
+      "homePhone": {"type": "string"},
+      "workPhone": {"type": "string"},
+      "fax": {"type": "string"},
+      "cellPhone": {"type": "string"},
+      "email": {"type": "string"},
+      "website": {"type": "string"},
+      "userId": {"type": "string"},
+      "password": {"type": "string"},
+      "cardType": {"type": "string"},
+      "cardNumber": {"type": "string"},
+      "cvc": {"type": "string"},
+      "expMonth": {"type": "string"},
+      "expYear": {"type": "string"},
+      "cardHolderName": {"type": "string"},
+      "cardIssuer": {"type": "string"},
+      "customerService": {"type": "string"},
+      "gender": {"type": "string"},
+      "ssn": {"type": "string"},
+      "driverLicense": {"type": "string"},
+      "birthMonth": {"type": "string"},
+      "birthDay": {"type": "string"},
+      "birthYear": {"type": "string"},
+      "age": {"type": "string"},
+      "birthPlace": {"type": "string"},
+      "income": {"type": "string"},
+      "customField": {"type": "string"},
+      "comments": {"type": "string"}
+    },
+    "required": [
+      "title", "firstName", "middleInitial", "lastName", "fullName", "company",
+      "position", "address1", "address2", "city", "state", "country", "zip",
+      "homePhone", "workPhone", "fax", "cellPhone", "email", "website", "userId",
+      "password", "cardType", "cardNumber", "cvc", "expMonth", "expYear",
+      "cardHolderName", "cardIssuer", "customerService", "gender", "ssn",
+      "driverLicense", "birthMonth", "birthDay", "birthYear", "age", "birthPlace",
+      "income", "customField", "comments"
+    ]
+  },
+  "steps": [
+    {
+      "type": "navigation",
+      "url": "https://www.roboform.com/filling-test-all-fields"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353101411,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"01___title\"]",
+      "value": "{title}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353103677,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"02frstname\"]",
+      "value": "{firstName}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353105304,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"03middle_i\"]",
+      "value": "{middleInitial}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353106516,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"04lastname\"]",
+      "value": "{lastName}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353107912,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"04fullname\"]",
+      "value": "{fullName}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353109581,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"05_company\"]",
+      "value": "{company}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353111017,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"06position\"]",
+      "value": "{position}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353112561,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"10address1\"]",
+      "value": "{address1}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353116393,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"11address2\"]",
+      "value": "{address2}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353118959,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"13adr_city\"]",
+      "value": "{city}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353120621,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"14adrstate\"]",
+      "value": "{state}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353122335,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"15_country\"]",
+      "value": "{country}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353124592,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"16addr_zip\"]",
+      "value": "{zip}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353126335,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"20homephon\"]",
+      "value": "{homePhone}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353128100,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"21workphon\"]",
+      "value": "{workPhone}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353129647,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"22faxphone\"]",
+      "value": "{fax}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353131581,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"23cellphon\"]",
+      "value": "{cellPhone}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353134506,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"24emailadr\"]",
+      "value": "{email}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353136694,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"25web_site\"]",
+      "value": "{website}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353138673,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"30_user_id\"]",
+      "value": "{userId}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353140676,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"password\"][name=\"31password\"]",
+      "value": "{password}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353144095,
+      "tabId": 1409140733,
+      "cssSelector": "select[name=\"40cc__type\"]",
+      "value": "{cardType}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353146489,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"41ccnumber\"]",
+      "value": "{cardNumber}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353148010,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"43cvc\"]",
+      "value": "{cvc}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353149679,
+      "tabId": 1409140733,
+      "cssSelector": "select[name=\"42ccexp_mm\"]",
+      "value": "{expMonth}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353150986,
+      "tabId": 1409140733,
+      "cssSelector": "select[name=\"43ccexp_yy\"]",
+      "value": "{expYear}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353153400,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"44cc_uname\"]",
+      "value": "{cardHolderName}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353154705,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"45ccissuer\"]",
+      "value": "{cardIssuer}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353156116,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"46cccstsvc\"]",
+      "value": "{customerService}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353157808,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"60pers_sex\"]",
+      "value": "{gender}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353158964,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"61pers_ssn\"]",
+      "value": "{ssn}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353159795,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"62driv_lic\"]",
+      "value": "{driverLicense}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353162912,
+      "tabId": 1409140733,
+      "cssSelector": "select[name=\"66mm\"]",
+      "value": "{birthMonth}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353164862,
+      "tabId": 1409140733,
+      "cssSelector": "select[name=\"67dd\"]",
+      "value": "{birthDay}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353166015,
+      "tabId": 1409140733,
+      "cssSelector": "select[name=\"68yy\"]",
+      "value": "{birthYear}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353174838,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"66pers_age\"]",
+      "value": "{age}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353177266,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"67birth_pl\"]",
+      "value": "{birthPlace}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353179220,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"68__income\"]",
+      "value": "{income}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353180603,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"71__custom\"]",
+      "value": "{customField}"
+    },
+    {
+      "type": "input",
+      "timestamp": 1746353183100,
+      "tabId": 1409140733,
+      "cssSelector": "input[type=\"text\"][name=\"72__commnt\"]",
+      "value": "{comments}"
+    }
+  ]
+}
