@@ -38,7 +38,8 @@
     position: 'fixed',
     top: '100px',
     right: '450px', // Adjusted to account for wider main panel (400px + padding)
-    width: '250px',
+    width: '350px',
+    maxHeight: '250px',
     background: '#161616',
     color: '#fff',
     padding: '16px',
@@ -54,7 +55,7 @@
   const historyTitle = document.createElement('div');
   historyTitle.innerText = '🧠 Workflow History';
   historyTitle.style.fontWeight = 'bold';
-  historyTitle.style.marginBottom = '12px';
+  historyTitle.style.fontSize = '12px';
 
   const historyList = document.createElement('div');
   historyList.id = 'workflow-steps';
@@ -62,18 +63,26 @@
   historyList.style.flexDirection = 'column';
   historyList.style.gap = '20px';
 
-  sidePanel.appendChild(historyTitle);
+  // Create a container for historyTitle and backButton
+  const historyHeader = document.createElement('div');
+  Object.assign(historyHeader.style, {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  });
+  historyHeader.appendChild(historyTitle);
+
   const backButton = document.createElement('button');
   backButton.innerText = 'Undo Last Step';
   Object.assign(backButton.style, {
-    marginBottom: '12px',
     background: '#444',
     color: '#fff',
-    padding: '6px 12px',
+    padding: '4px 8px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
   });
   backButton.onclick = () => {
     const lastStep = historyList.lastElementChild;
@@ -82,7 +91,12 @@
       window.notifyPython?.('control', { action: 'back' });
     }
   };
-  sidePanel.appendChild(backButton);
+
+  historyHeader.appendChild(backButton);
+
+  // Append the new container to the sidePanel
+  sidePanel.appendChild(historyHeader);
+
   sidePanel.appendChild(historyList);
   overlay.appendChild(sidePanel);
 
@@ -127,6 +141,7 @@
   toggleHistoryBtn.onclick = () => {
     const isVisible = sidePanel.style.display !== 'none';
     sidePanel.style.display = isVisible ? 'none' : 'block';
+    sidePanel.scrollTop = sidePanel.scrollHeight;
     if (!isVisible) {
       const rect = overlay.getBoundingClientRect();
       sidePanel.style.top = `${rect.top}px`;
@@ -174,7 +189,7 @@
     fontSize: '13px',
     overflowY: 'auto',
     overflowX: 'auto',
-    maxHeight: '120px',
+    maxHeight: '140px',
     boxSizing: 'border-box',
     whiteSpace: 'normal',
     wordBreak: 'break-word',
@@ -261,6 +276,8 @@
     document.changeHandlerAttached = false;
     document.removeEventListener('keydown', keydownHandler, true);
     document.keydownHandlerAttached = false;
+    // window.removeEventListener('scroll', scrollHandler);
+    // window.scrollHandlerAttached = false;
     window.removeEventListener('popstate', popstateHandler);
     window.popstateHandlerAttached = false;
     window.removeEventListener('load', loadHandler);
@@ -388,39 +405,370 @@
     }
     outputBox.scrollTop = outputBox.scrollHeight; // Scroll to the latest line
   };
-  const renderWorkflowStep = ({ step, action }) => {
+
+  //
+  // Recorder in-built workflow steps
+  //
+
+  const renderWorkflowStep = ({ step, action, cssSelector }) => {
+    sidePanel.scrollTop = sidePanel.scrollHeight;
     const container = document.createElement('div');
-    container.style.display = 'flex';
-    container.style.alignItems = 'flex-start';
-    container.style.gap = '12px';
-    container.style.position = 'relative';
+    Object.assign(container.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '12px',
+      background: '#2a2a2a',
+      border: '1px solid #3a3a3a',
+      borderRadius: '8px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+      cursor: 'move',
+      transition: 'opacity 0.2s ease',
+    });
+    container.dataset.stepIndex = step;
+    container.dataset.actionType = action.toLowerCase();
 
     const dot = document.createElement('div');
-    dot.style.width = '12px';
-    dot.style.height = '12px';
-    dot.style.borderRadius = '50%';
-    dot.style.background = '#4CAF50';
-    dot.style.marginTop = '4px';
-    dot.style.flexShrink = '0';
-    if (/type|enter/i.test(action)) {
-      dot.style.background = '#ff9800'; // orange
-    } else {
-      dot.style.background = '#4CAF50'; // green
-    }
+    const actionColorMap = {
+      click: '#4CAF50',
+      input: '#ff9800',
+      select_change: '#2196F3',
+      key_press: '#9C27B0',
+      navigation: '#F44336',
+    };
+    const actionType = action.toLowerCase().replace(/\s+/g, '_');
+    const dotColor = actionColorMap[actionType] || '#4CAF50';
+    Object.assign(dot.style, {
+      width: '12px',
+      height: '12px',
+      borderRadius: '50%',
+      background: dotColor,
+      flexShrink: '0',
+    });
 
     const info = document.createElement('div');
-    info.style.display = 'flex';
-    info.style.flexDirection = 'column';
+    Object.assign(info.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      flex: '1',
+    });
 
     const actionText = document.createElement('div');
-    actionText.innerText = `🛠 ${action}`;
-    actionText.style.fontWeight = 'bold';
+    actionText.innerText = `${action}`;
+    Object.assign(actionText.style, {
+      fontWeight: 'bold',
+      fontSize: '14px',
+      color: '#fff',
+    });
+
+    const cssSelectorText = document.createElement('div');
+    cssSelectorText.innerText = cssSelector;
+    Object.assign(cssSelectorText.style, {
+      fontSize: '12px',
+      color: '#bbb',
+    });
 
     info.appendChild(actionText);
-
+    info.appendChild(cssSelectorText);
     container.appendChild(dot);
     container.appendChild(info);
-    container.dataset.stepIndex = step;
+
+    const deleteIcon = document.createElement('span');
+    deleteIcon.innerText = '🗑️';
+    Object.assign(deleteIcon.style, {
+      cursor: 'pointer',
+      marginLeft: 'auto',
+      color: '#f44336',
+      padding: '4px',
+      background: '#3a3a3a',
+      borderRadius: '4px',
+    });
+    deleteIcon.onclick = () => {
+      index = Array.from(historyList.children).indexOf(container);
+      container.remove();
+      window.notifyPython?.('deleteStep', { index: index });
+    };
+
+    if (actionText.innerText !== 'navigation') {
+      container.appendChild(deleteIcon);
+    }
+
+    let placeholder = null;
+    let originalIndex = 0; // Track the original index of the dragged element
+
+    container.onmousedown = (e) => {
+      // Prevent dragging if the container is a navigation step
+      if (container.dataset.actionType === 'navigation') {
+        console.warn(
+          'Attempted to drag a navigation element; operation not allowed.'
+        );
+        // Create warning bubble
+        let warningBubble = document.getElementById('warning-bubble');
+        if (!warningBubble) {
+          warningBubble = document.createElement('div');
+          warningBubble.id = 'warning-bubble';
+          const historyRect = sidePanel.getBoundingClientRect();
+          Object.assign(warningBubble.style, {
+            position: 'fixed',
+            top: `${historyRect.top}px`, // Align with top of historyList
+            left: `${historyRect.left + historyRect.width / 2}px`,
+            transform: 'translateX(-50%)',
+            background: '#2a2a2a',
+            color: '#fff',
+            padding: '8px 12px',
+            border: '2px solid #F44336',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontFamily: fontFamily,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: '2147483648',
+            whiteSpace: 'normal',
+            maxWidth: '300px',
+            textAlign: 'center',
+            animation: 'fadeInOut 2s ease-in-out',
+          });
+          // Add triangular pointer
+          const pointer = document.createElement('div');
+          Object.assign(pointer.style, {
+            position: 'absolute',
+            bottom: '-8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '0',
+            height: '0',
+            borderLeft: '8px transparent solid',
+            borderRight: '8px transparent solid',
+            borderTop: '8px solid #F44336',
+          });
+          warningBubble.appendChild(pointer);
+          document.body.appendChild(warningBubble); // Append to document.body
+        }
+        // Update bubble content
+        warningBubble.textContent =
+          'Cannot drag navigation step! This operation is not allowed.';
+        warningBubble.style.display = 'block';
+        // Remove bubble after 2 seconds
+        setTimeout(() => warningBubble.remove(), 2000);
+        // Add CSS animation
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+          @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+          }
+        `;
+        document.head.appendChild(styleSheet);
+        return; // Stop further processing
+      }
+      // Prevent dragging if the mouse is within the deleteIcon's bounding box
+      const deleteIconRect = deleteIcon.getBoundingClientRect();
+      if (
+        e.clientX >= deleteIconRect.left &&
+        e.clientX <= deleteIconRect.right &&
+        e.clientY >= deleteIconRect.top &&
+        e.clientY <= deleteIconRect.bottom
+      ) {
+        return;
+      }
+      originalIndex = Array.from(historyList.children).indexOf(container);
+
+      e.preventDefault();
+      placeholder = document.createElement('div');
+      Object.assign(placeholder.style, {
+        width: '100%',
+        height: container.offsetHeight + 'px',
+        background: '#1d1d1d',
+        border: '2px dashed #444',
+        borderRadius: '8px',
+        opacity: '0.5',
+      });
+      container.parentNode.replaceChild(placeholder, container);
+      Object.assign(container.style, {
+        position: 'fixed',
+        zIndex: '2147483647',
+        opacity: '0.7',
+        left: `${e.clientX - container.offsetWidth / 2}px`,
+        top: `${e.clientY - container.offsetHeight / 2}px`,
+      });
+      document.body.appendChild(container);
+
+      const onMouseMove = (moveEvent) => {
+        container.style.left = `${
+          moveEvent.clientX - container.offsetWidth / 2
+        }px`;
+        container.style.top = `${
+          moveEvent.clientY - container.offsetHeight / 2
+        }px`;
+
+        // Track mouse Y and swap placeholder
+        const mouseY = moveEvent.clientY;
+        const steps = Array.from(historyList.children);
+        steps.forEach((step, index) => {
+          if (step === placeholder || step === container) return;
+          const rect = step.getBoundingClientRect();
+          if (mouseY >= rect.top && mouseY <= rect.bottom) {
+            // Check if the step is a navigation step
+            const stepAction = step.dataset.actionType;
+            if (stepAction === 'navigation') {
+              console.warn(
+                'Attempted to cross navigation element; dropping element.'
+              );
+              // Dispatch mouseup event to force drop
+              const mouseUpEvent = new MouseEvent('mouseup', {
+                bubbles: true,
+                cancelable: true,
+                clientX: moveEvent.clientX,
+                clientY: moveEvent.clientY,
+              });
+              document.dispatchEvent(mouseUpEvent);
+              // Create warning bubble
+              let warningBubble = document.getElementById('warning-bubble');
+              if (!warningBubble) {
+                warningBubble = document.createElement('div');
+                warningBubble.id = 'warning-bubble';
+                const historyRect = sidePanel.getBoundingClientRect();
+                Object.assign(warningBubble.style, {
+                  position: 'fixed',
+                  top: `${historyRect.top}px`, // Align with top of historyList
+                  left: `${historyRect.left + historyRect.width / 2}px`,
+                  transform: 'translateX(-50%)',
+                  background: '#2a2a2a',
+                  color: '#fff',
+                  padding: '8px 12px',
+                  border: '2px solid #F44336',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontFamily: fontFamily,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                  zIndex: '2147483648',
+                  whiteSpace: 'normal',
+                  maxWidth: '300px',
+                  textAlign: 'center',
+                  animation: 'fadeInOut 2s ease-in-out',
+                });
+                // Add triangular pointer
+                const pointer = document.createElement('div');
+                Object.assign(pointer.style, {
+                  position: 'absolute',
+                  bottom: '-8px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '0',
+                  height: '0',
+                  borderLeft: '8px transparent solid',
+                  borderRight: '8px transparent solid',
+                  borderTop: '8px solid #F44336',
+                });
+                warningBubble.appendChild(pointer);
+                document.body.appendChild(warningBubble); // Append to document.body
+              }
+              // Update bubble content
+              warningBubble.textContent =
+                'Cannot cross navigation step! This will break the workflow logic.';
+              warningBubble.style.display = 'block';
+              // Remove bubble after 2 seconds
+              setTimeout(() => warningBubble.remove(), 2000);
+              // Add CSS animation
+              const styleSheet = document.createElement('style');
+              styleSheet.textContent = `
+                @keyframes fadeInOut {
+                  0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+                  10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                  90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                  100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+                }
+              `;
+              document.head.appendChild(styleSheet);
+              return; // Stop further processing
+            }
+            // Swap placeholder with the step
+            const placeholderParent = placeholder.parentNode;
+            const stepParent = step.parentNode;
+            const placeholderNext = placeholder.nextSibling;
+            const stepNext = step.nextSibling;
+
+            if (placeholderParent && stepParent) {
+              if (placeholderNext) {
+                placeholderParent.insertBefore(step, placeholderNext);
+              } else {
+                placeholderParent.appendChild(step);
+              }
+              if (stepNext) {
+                stepParent.insertBefore(placeholder, stepNext);
+              } else {
+                stepParent.appendChild(placeholder);
+              }
+            }
+          }
+        });
+      };
+      document.addEventListener('mousemove', onMouseMove);
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        container.remove();
+        placeholder.parentNode.replaceChild(container, placeholder);
+        Object.assign(container.style, {
+          position: 'relative',
+          zIndex: 'auto',
+          opacity: '1',
+          left: 'auto',
+          top: 'auto',
+        });
+        placeholder = null;
+
+        const newIndex = Array.from(historyList.children).indexOf(container);
+        if (originalIndex !== newIndex) {
+          const textContent = container.querySelector('div > div:nth-child(2)');
+          const updatedStep = {
+            action: textContent ? textContent.innerText.split('\n')[0] : '',
+            cssSelector: textContent
+              ? textContent.innerText.split('\n')[1]
+              : '',
+            originalIndex: originalIndex,
+            newIndex: newIndex,
+          };
+          window.notifyPython?.('reorderSteps', { step: updatedStep });
+        }
+      };
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    container.addEventListener('mouseenter', () => {
+      const cssSelector = container
+        .querySelector('div > div:nth-child(2)')
+        .innerText.split('\n')[1];
+      const elementToHighlight = document.querySelector(cssSelector);
+      if (elementToHighlight) {
+        const rect = elementToHighlight.getBoundingClientRect();
+        const highlightOverlay = document.createElement('div');
+        Object.assign(highlightOverlay.style, {
+          position: 'absolute',
+          top: `${rect.top + window.scrollY}px`,
+          left: `${rect.left + window.scrollX}px`,
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+          border: '2px solid lightgreen',
+          backgroundColor: 'rgba(144, 238, 144, 0.2)', // lightgreen tint
+          pointerEvents: 'none',
+          zIndex: '2147483000',
+        });
+        highlightOverlay.className = 'highlight-overlay';
+        document.body.appendChild(highlightOverlay);
+      } else {
+        console.warn('No element found for selector:', cssSelector);
+      }
+    });
+
+    container.addEventListener('mouseleave', () => {
+      const highlightOverlays = document.querySelectorAll('.highlight-overlay');
+      if (highlightOverlays.length > 0) {
+        highlightOverlays.forEach((overlay) => overlay.remove());
+      }
+    });
 
     historyList.appendChild(container);
   };
@@ -517,30 +865,11 @@
     }
   }
 
-  // const keydownHandler = (e) => {
-  //   console.log('keydown event triggered');
-
-  //   if (e.key.length === 1) {
-  //     currentTypedText += e.key;
-  //   } else if (e.key === 'Backspace') {
-  //     currentTypedText = currentTypedText.slice(0, -1);
-  //   } else if (e.key === 'Enter' || e.key === 'Tab') {
-  //     if (currentTypedText) {
-  //       window.notifyPython?.('elementType', {
-  //         text: currentTypedText,
-  //         mode: 'enter',
-  //       });
-  //       currentTypedText = '';
-  //     }
-  //   }
-  // };
-
   const clickHandler = (event) => {
     console.log('click event triggered');
 
     // Check if the click is on the recorder UI
     if (overlay.contains(event.target)) return;
-    console.log('event');
 
     const targetElement = event.target;
     try {
@@ -661,6 +990,21 @@
     }
   };
 
+  // const scrollHandler = (event) => {
+  //   console.log('scroll event triggered');
+  //   try {
+  //     const scrollData = {
+  //       url: document.location.href,
+  //       frameUrl: window.location.href,
+  //       scrollY: window.scrollY, // Vertical scroll position in pixels
+  //       scrollX: window.scrollX, // Horizontal scroll position in pixels
+  //     };
+  //     window.notifyPython?.('elementScroll', scrollData);
+  //   } catch (error) {
+  //     console.error('Error capturing scroll data:', error);
+  //   }
+  // };
+
   const popstateHandler = () => {
     console.log('popstate event triggered');
     window.notifyPython?.('navigation', { url: window.location.href });
@@ -680,6 +1024,8 @@
   document.changeHandlerAttached = true;
   document.addEventListener('keydown', keydownHandler, true);
   document.keydownHandlerAttached = true;
+  // window.addEventListener('scroll', scrollHandler);
+  // window.scrollHandlerAttached = true;
 
   window.addEventListener('popstate', popstateHandler);
   window.popstateHandlerAttached = true;
@@ -893,9 +1239,9 @@
         inputBox.appendChild(submit);
       }
     },
-    addWorkflowStep: (action) => {
+    addWorkflowStep: (action, cssSelector) => {
       const step = historyList.children.length;
-      renderWorkflowStep({ step, action });
+      renderWorkflowStep({ step, action, cssSelector });
     },
   };
   setTimeout(() => {
