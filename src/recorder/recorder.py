@@ -4,6 +4,7 @@ import json
 import os
 import uuid
 from importlib import resources
+from pathlib import Path
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -30,7 +31,7 @@ class WorkflowStep:
 			setattr(self, key, value)
 
 class WorkflowRecorder:
-	def __init__(self, browser_config: Optional[BrowserConfig] = None):
+	def __init__(self, output_dir: Path, browser_config: Optional[BrowserConfig] = None):
 		self.browser_config = browser_config
 		self.js_overlay = resources.read_text('src.recorder', 'gui.js')
 		self.steps: List[WorkflowStep] = []
@@ -40,7 +41,7 @@ class WorkflowRecorder:
 		self.recording = False
 		self._should_exit = False
 		self._workflow_saved = False
-		self.output_dir = ''
+		self.output_dir = output_dir
 		self.description = ''
 		self.action_name = ''
 		self.current_url = ''
@@ -470,15 +471,14 @@ class WorkflowRecorder:
 			return
 		try:
 			# Use a default directory for the output
-			default_output_dir = 'workflows'
-			output_dir_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), default_output_dir)
+			output_dir_path = self.output_dir
 			os.makedirs(output_dir_path, exist_ok=True)
 
 			# Use a timestamp and UUID for the filename
-			filename = f'workflow_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex}.json'
+			filename = f'recording_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
 			filepath = os.path.join(output_dir_path, filename)
 
-			print(f'Attempting to save workflow to: {filepath}')
+			print(f'Attempting to save recording to: {filepath}')
 
 			workflow_data = {
 				'timestamp': datetime.datetime.now().isoformat(),

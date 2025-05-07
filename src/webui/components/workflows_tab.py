@@ -20,6 +20,9 @@ from src.workflows.workflow_builder import parse_session
 # Directory to store user workflows
 WORKFLOW_STORAGE_DIR = Path("./saved_workflows")
 WORKFLOW_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+# Directory to store user recordings
+RECORD_STORAGE_DIR = Path("./saved_recordings")
+RECORD_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # Set chrome path
@@ -44,6 +47,10 @@ CHROME_PATH = get_executable_path()
 def _list_saved_workflows() -> list[str]:
     """Return a sorted list of saved workflow filenames (relative)."""
     return sorted([p.name for p in WORKFLOW_STORAGE_DIR.glob("*.json")])
+
+def _list_saved_recordings() -> list[str]:
+    """Return a sorted list of saved recording filenames (relative)."""
+    return sorted([p.name for p in RECORD_STORAGE_DIR.glob("*.json")])
 
 
 def create_workflows_tab(webui_manager: WebuiManager):
@@ -72,6 +79,9 @@ def create_workflows_tab(webui_manager: WebuiManager):
     with gr.Tabs():
         # Recording Tab
         with gr.TabItem("🔴 Run Recorder"):
+            gr.Markdown("""
+                    ##### When the recording is finished or imported, it will be saved to the "🛠️ Workflow Builder" page!
+                    """)
             with gr.Row():
                 # Column 1: Browser-based in-built recorder
                 with gr.Column():
@@ -80,7 +90,6 @@ def create_workflows_tab(webui_manager: WebuiManager):
                     Record your session directly in the browser using the in-built recorder:
                     - Navigate to the website you want to record.
                     - Use the in-built recorder to capture your actions.
-                    - Download the session as a JSON file.
                     """)
                     url_input = gr.Textbox(
                         label="Website URL to begin the recording (default: browser-use.com)",
@@ -95,15 +104,29 @@ def create_workflows_tab(webui_manager: WebuiManager):
                     Record your session using the browser extension:
                     1. Install the browser extension (chrome://extensions/ → Developer mode → Load unpacked)
                     2. Click the extension, record your session, and download the JSON file
+                    3. The JSON will be saved to your recordings
                     """)
                     session_json_file = gr.File(
                         label="Session JSON (.json)",
                         file_types=[".json"],
                         interactive=True
                     )
+                    session_save_status = gr.Textbox(
+                        label="Upload Status",
+                        lines=1,
+                        interactive=False
+                    )
+
+
         # Create Workflow Tab
-        with gr.TabItem("🛠️ Create Workflow"):
+        with gr.TabItem("🛠️ Workflow Builder "):
             gr.Markdown("#### Chat to generate workflow from recording")
+            session_dropdown = gr.Dropdown(
+                label="Select Recorded Session JSON",
+                choices=_list_saved_recordings(),
+                interactive=True
+            )
+            refresh_sessions_button = gr.Button("Refresh Saved Recordings", variant="secondary")
             workflow_chat = gr.Chatbot(label="Workflow Chat")
             chat_input = gr.Textbox(
                 placeholder="Type a prompt to generate", lines=1, interactive=True
@@ -132,7 +155,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
             )
 
         # Run Workflow Tab
-        with gr.TabItem("🚀 Run Workflow"):
+        with gr.TabItem("🚀 Run Workflows"):
             gr.Markdown("### Run a Saved Workflow")
             with gr.Row():
                 workflow_file = gr.File(
@@ -173,6 +196,9 @@ def create_workflows_tab(webui_manager: WebuiManager):
         "run_recorder": run_recorder,
         "url_input": url_input,
         "session_json_file": session_json_file,
+        "session_save_status": session_save_status,
+        "session_dropdown": session_dropdown,
+        "refresh_sessions_button": refresh_sessions_button,
         "use_vision_cb": use_vision_cb,
         "workflow_chat": workflow_chat,
         "chat_input": chat_input,
@@ -218,6 +244,26 @@ def create_workflows_tab(webui_manager: WebuiManager):
         if any(part in ("..", "/") for part in name.split(os.sep)):
             return None
         return name
+    
+    def _save_session_json(file_obj):
+        """Save uploaded session JSON to RECORD_STORAGE_DIR."""
+        if not file_obj:
+            return gr.update(value="⚠️ No file uploaded.")
+        
+        file_path = Path(getattr(file_obj, "name", file_obj))
+        if not file_path.exists():
+            return gr.update(value=f"⚠️ File not found: {file_path}")
+        
+        try:
+            sanitized = _sanitize_filename(file_path.name)
+            if not sanitized:
+                return gr.update(value="⚠️ Invalid filename.")
+            
+            save_path = RECORD_STORAGE_DIR / sanitized
+            save_path.write_text(file_path.read_text(encoding="utf-8"), encoding="utf-8")
+            return gr.update(value=f"✅ Saved session to {save_path}")
+        except Exception as e:
+            return gr.update(value=f"❌ Failed to save session: {e}")
 
     def _initialize_llm(
         provider: Optional[str],
@@ -424,7 +470,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # Execute workflow
         try:
             config = BrowserConfig(
-                browser_binary_path=CHROME_PATH,
+                # browser_binary_path=CHROME_PATH,
                 headless=False,
             )
             browser = Browser(config=config)
@@ -471,7 +517,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
         # Execute workflow
         try:
             config = BrowserConfig(
-                browser_binary_path=CHROME_PATH,
+                # browser_binary_path=CHROME_PATH,
                 headless=False,
             )
             browser = Browser(config=config)
@@ -499,9 +545,9 @@ def create_workflows_tab(webui_manager: WebuiManager):
             os.getenv("CHROME_PATH", None)
         )
         config=BrowserConfig(
-            browser_binary_path=browser_binary_path,
+            # browser_binary_path=browser_binary_path,
         )
-        recorder = WorkflowRecorder(config)
+        recorder = WorkflowRecorder(RECORD_STORAGE_DIR, config)
         url = url.strip()
         if not url:
             url = 'https://www.browser-use.com/'
@@ -744,6 +790,12 @@ def create_workflows_tab(webui_manager: WebuiManager):
         outputs=[run_recorder]
     )
 
+    session_json_file.upload(
+        fn=_save_session_json,
+        inputs=[session_json_file],
+        outputs=[session_save_status]
+    )
+
     # Create Workflow Tab Callbacks
     chat_button.click(
         fn=_generate_via_chat,
@@ -754,6 +806,11 @@ def create_workflows_tab(webui_manager: WebuiManager):
         fn=_save_generated_workflow,
         inputs=[generated_json, generated_filename_tb],
         outputs=[generated_save_status, saved_workflows_dd],
+    )
+    refresh_sessions_button.click(
+        fn=lambda: gr.update(choices=_list_saved_recordings()),
+        inputs=None,
+        outputs=[session_dropdown]
     )
 
     # Run Workflow Tab Callbacks
