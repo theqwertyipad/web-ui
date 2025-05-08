@@ -165,6 +165,7 @@ def parse_session(
     user_goal: str | None = None,
     use_screenshots: bool = False,
     llm: BaseChatModel | None = None,
+    file_saving_path: str | None = None
 ) -> Workflow:
     """Generate a Workflow JSON from a *simplified session* JSON file using an LLM.
 
@@ -243,8 +244,12 @@ def parse_session(
     print("Extracted Workflow JSON:")
     print(json_content)
 
-    # Persist JSON next to original JSON file
-    json_path = session_file.with_suffix(".workflow.json")
+    # Persist JSON to the specified directory with the same filename and suffix if file_saving_path is provided
+    if file_saving_path:
+        saving_path = Path(file_saving_path)
+        json_path = saving_path.with_suffix(".workflow.json")
+    else:
+        json_path = session_file.with_suffix(".workflow.json")
     json_path.write_text(json_content, encoding="utf-8")
 
     # Return a ready-to-use Workflow instance
