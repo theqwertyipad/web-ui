@@ -1,6 +1,7 @@
 # flake8: noqa
 import json
 import os
+import re
 import sys
 import traceback
 import uuid
@@ -18,12 +19,17 @@ from src.webui.webui_manager import WebuiManager
 from src.workflows.workflow import Workflow
 from src.workflows.workflow_builder import parse_session
 
+# Base directory for persistent storage
+BASE_STORAGE_DIR = Path("data_storage")
 # Directory to store user workflows
-WORKFLOW_STORAGE_DIR = Path("./saved_workflows")
-WORKFLOW_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+WORKFLOW_STORAGE_DIR = BASE_STORAGE_DIR / "workflows"
 # Directory to store user recordings
-RECORD_STORAGE_DIR = Path("./saved_recordings")
-RECORD_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+RECORD_STORAGE_DIR = BASE_STORAGE_DIR / "recordings"
+# Directory to store AI-generated parsing results
+PARSING_STORAGE_DIR = BASE_STORAGE_DIR / "parsings"
+# Ensure directories exist
+for dir_path in [WORKFLOW_STORAGE_DIR, RECORD_STORAGE_DIR, PARSING_STORAGE_DIR]:
+    dir_path.mkdir(parents=True, exist_ok=True)
 
 # Set chrome path
 def get_executable_path() -> str:
@@ -143,7 +149,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                         - It will decide what type of information goes where in future runs.
                         """
                     )
-                    workflow_chat = gr.Chatbot(label="Workflow Chat")
+                    workflow_chat = gr.Chatbot(label="Workflow Chat", type="messages")
                     chat_input = gr.Textbox(
                         placeholder="Type a prompt to generate (e.g., 'Create a login workflow')",
                         lines=1,
@@ -215,7 +221,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                         label="Select from list",
                         choices=_list_saved_workflows(),
                         interactive=True,
-                        value=_list_saved_workflows()[0] if _list_saved_workflows() else None,
+                        value=None,
                     )
                     refresh_saved_button = gr.Button("Refresh", variant="secondary")
             upload_workflow = gr.Code(
@@ -319,6 +325,10 @@ def create_workflows_tab(webui_manager: WebuiManager):
         except Exception as e:
             return gr.update(value=f"❌ Failed to save session: {e}")
         
+    def _build_empty_input_json(schema: dict) -> str:
+        props = schema.get("properties", {})
+        return json.dumps({key: "" for key in props.keys()}, indent=2)
+            
     def _save_uploaded_workflow(file_obj):
         """Save uploaded workflow JSON to WORKFLOW_STORAGE_DIR and update dropdown."""
         if not file_obj:
@@ -428,37 +438,50 @@ def create_workflows_tab(webui_manager: WebuiManager):
         """Convert the DataFrame back to an input_schema and update the original JSON."""
         try:
             data = json.loads(original_json) if original_json.strip() else {}
+            
             if "name" not in data or not data["name"].strip():
                 raise ValueError("JSON must contain a non-empty 'name' field")
             if "description" not in data or not data["description"].strip():
                 raise ValueError("JSON must contain a non-empty 'description' field")
             if "version" not in data:
                 data["version"] = "1.0"
-            properties = {}
-            for _, row in df.iterrows():
-                prop_name = row["Property Name"].strip()
-                prop_type = row["Type"].strip()
-                if prop_name:
-                    properties[prop_name] = {"type": prop_type if prop_type else "string"}
-            original_required = data.get("input_schema", {}).get("required", [])
-            print(original_required)
-            new_required = [prop_name for prop_name in properties.keys() if prop_name in original_required]
-            print(new_required)
+
+            old_properties = data.get("input_schema", {}).get("properties", {})
+            old_to_new_names = {}
+            old_to_new_types = {}
+
+            new_properties = {}
+            for old_key, (_, row) in zip(old_properties.keys(), df.iterrows()):
+                new_key = row["Property Name"].strip()
+                new_type = row["Type"].strip() if row["Type"].strip() else "string"
+
+                if new_key:
+                    new_properties[new_key] = {"type": new_type}
+                    old_to_new_names[old_key] = new_key
+                    old_to_new_types[old_key] = new_type
+
             data["input_schema"] = {
                 "type": "object",
-                "properties": properties,
-                "required": new_required
+                "properties": new_properties,
+                "required": list(new_properties.keys())
             }
+
+            # Replace all occurrences in steps
+            steps_str = json.dumps(data["steps"])
+            for old_name, new_name in old_to_new_names.items():
+                steps_str = re.sub(rf"\{{\s*{re.escape(old_name)}\s*\}}", f"{{{new_name}}}", steps_str)
+            data["steps"] = json.loads(steps_str)
+
             return json.dumps(data, indent=2, ensure_ascii=False)
         except json.JSONDecodeError:
             raise ValueError("Invalid JSON format")
         except ValueError as e:
             raise ValueError(str(e))
 
-    def _load_workflow_file(file_obj_or_filename: Any) -> tuple[Optional[str], Optional[str]]:
+    def _load_workflow_file(file_obj_or_filename: Any) -> tuple[Optional[str], Optional[str], Optional[str]]:
         """Load workflow JSON file content from uploaded file, path string, or filename."""
         if file_obj_or_filename is None:
-            return None, None
+            return None, None, None
 
         # Handle both file objects and filenames
         if isinstance(file_obj_or_filename, str):
@@ -468,20 +491,23 @@ def create_workflows_tab(webui_manager: WebuiManager):
             # If it's a file object, get the path from the 'name' attribute
             file_path_str = getattr(file_obj_or_filename, "name", str(file_obj_or_filename))
             if not file_path_str:
-                return None, None
+                return None, None, None
             file_path = Path(file_path_str)
 
         if not file_path.exists():
             print(f"File not found during load: {file_path}")
-            return None, None
+            return None, None, None
 
         try:
             workflow_content = file_path.read_text(encoding="utf-8")
+            data = json.loads(workflow_content)
+            schema = data.get("input_schema", {})
             schema_text = _extract_schema(workflow_content)
-            return workflow_content, schema_text
+            empty_inputs = _build_empty_input_json(schema)
+            return workflow_content, schema_text, empty_inputs
         except Exception as e:
             print(f"Error loading workflow file {file_path}: {e}")
-            return None, None
+            return None, None, None
 
     def _get_agent_settings(components_dict):
         """Helper to get LLM settings from Agent Settings tab."""
@@ -561,8 +587,8 @@ def create_workflows_tab(webui_manager: WebuiManager):
             browser = Browser(config=config)
             workflow = Workflow(json_path=str(wf_path), browser=browser)
             results = await workflow.run_async(inputs=inputs_dict or None)
-            pretty = json.dumps(results, indent=2, ensure_ascii=False)
-            return gr.update(value=f"✅ Workflow finished successfully\n\n{pretty}")
+            # pretty = json.dumps(results, indent=2, ensure_ascii=False) # TODO Add JSON serialization of the results to the output
+            return gr.update(value=f"✅ Workflow finished successfully!\n\nValues used:\n\n{inputs_json}")
         except Exception as e:
             tb = traceback.format_exc()
             return gr.update(value=f"❌ Error running workflow: {e}\n\n{tb}")
@@ -762,13 +788,14 @@ def create_workflows_tab(webui_manager: WebuiManager):
     def _generate_via_chat(session_file, user_msg, chat_history, use_vision):
         print("--- Generating via Chat ---")
         chat_history = chat_history or []
-        chat_history.append(("user", user_msg))
+        chat_history.append({"role": "user", "content": user_msg})
         # Ensure session_path is always a string
         session_path = RECORD_STORAGE_DIR / session_file
+        file_saving_path = PARSING_STORAGE_DIR / session_file
         print(f"  Session Path: {session_path}")
         if not session_path:
-            print("  ⚠️ No session file uploaded.")
-            chat_history.append(("bot", "⚠️ Please upload a session JSON file."))
+            bot_msg = "⚠️ Please upload a session JSON file."
+            chat_history.append({"role": "assistant", "content": bot_msg})
             return chat_history, gr.update(value="")
 
         # We need to create a components_dict from known components to pass to _get_agent_settings
@@ -786,28 +813,26 @@ def create_workflows_tab(webui_manager: WebuiManager):
         )
         print(f"  LLM Initialized: {llm is not None}")
         if llm is None:
-            print("  ❌ LLM is None, returning error to chat.")
-            chat_history.append(
-                ("bot", "❌ Failed to initialize LLM. Check Agent Settings. ")
-            )
+            bot_msg = "❌ Failed to initialize LLM. Check Agent Settings."
+            chat_history.append({"role": "assistant", "content": bot_msg})
             return chat_history, gr.update(value="")
         try:
             print("  Attempting parse_session...")
             workflow_obj = parse_session(
-                session_path, user_goal=user_msg, llm=llm, use_screenshots=use_vision
+                session_path, user_goal=user_msg, llm=llm, use_screenshots=use_vision, file_saving_path=file_saving_path
             )
             print(
                 f"  Parse session successful. Workflow path: {workflow_obj.json_path}"
             )
             text = Path(workflow_obj.json_path).read_text(encoding="utf-8")
             schema_df = _schema_to_dataframe(text)
-            chat_history.append(("bot", text))
+            chat_history.append({"role": "assistant", "content": text})
             print("  Added workflow JSON to chat history.")
             return chat_history, gr.update(value=text), gr.update(value=schema_df)
         except Exception as e:
             tb = traceback.format_exc()
-            print(f"  ❌ Exception during parse_session: {e}\n{tb}")
-            chat_history.append(("bot", f"❌ Error generating workflow: {e}\n\n{tb}"))
+            bot_msg = f"❌ Error generating workflow: {e}\n\n{tb}"
+            chat_history.append({"role": "assistant", "content": bot_msg})
             return chat_history, gr.update(value=""), gr.update(value=pd.DataFrame(columns=["Property Name", "Type"]))
 
     # --- ALL CALLBACKS MOVED HERE --- #
@@ -853,11 +878,11 @@ def create_workflows_tab(webui_manager: WebuiManager):
         inputs=None,
         outputs=[saved_workflows_dd],
     )
-    # Add this to the "Run Workflow Tab Callbacks" section
+
     saved_workflows_dd.change(
-        fn=lambda x: _load_workflow_file(x) if x else (None, None),
+        fn=lambda x: _load_workflow_file(x) if x else (None, None, None),
         inputs=[saved_workflows_dd],
-        outputs=[upload_workflow, uploaded_json_schema],
+        outputs=[upload_workflow, uploaded_json_schema, uploaded_workflow_inputs_json],
     )
     workflow_file.upload(
         fn=_save_uploaded_workflow,
