@@ -53,7 +53,7 @@
   });
 
   const historyTitle = document.createElement('div');
-  historyTitle.innerText = '🧠 Workflow History';
+  historyTitle.innerText = '🧠 Recording History';
   historyTitle.style.fontWeight = 'bold';
   historyTitle.style.fontSize = '12px';
 
@@ -78,11 +78,12 @@
   Object.assign(backButton.style, {
     background: '#444',
     color: '#fff',
-    padding: '4px 8px',
+    fontWeight: 'bold',
+    fontSize: '12px',
+    padding: '4px 10px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '12px',
   });
   backButton.onclick = () => {
     const lastStep = historyList.lastElementChild;
@@ -106,7 +107,9 @@
   Object.assign(toggleBtn.style, {
     background: recording ? '#e53935' : '#4CAF50',
     color: 'white',
-    padding: '3px 8px',
+    fontWeight: 'bold',
+    fontSize: '12px',
+    padding: '4px 10px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -122,20 +125,18 @@
 
   // History button
   const toggleHistoryBtn = document.createElement('button');
-  toggleHistoryBtn.innerText = '🧠';
-  toggleHistoryBtn.title = 'Toggle Workflow History';
+  toggleHistoryBtn.innerText = 'Edit steps';
+  // toggleHistoryBtn.title = 'Toggle Workflow History';
   Object.assign(toggleHistoryBtn.style, {
     background: '#3a3a3a',
     color: 'white',
-    padding: '3px 6px',
+    padding: '4px 10px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: '32px',
+    fontSize: '12px',
+    display: 'inline-block',
+    fontWeight: 'bold',
   });
 
   toggleHistoryBtn.onclick = () => {
@@ -149,19 +150,6 @@
       sidePanel.style.right = 'auto';
     }
   };
-
-  // Stop button
-  Object.assign(toggleBtn.style, {
-    background: '#e53935',
-    color: 'white',
-    padding: '4px 12px',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'none',
-  });
 
   headerButtons.appendChild(toggleHistoryBtn);
   headerButtons.appendChild(toggleBtn);
