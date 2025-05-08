@@ -8,7 +8,7 @@
     top: '100px',
     right: '30px',
     width: '300px',
-    background: '#1a1a1a',
+    background: '#161616',
     color: '#fff',
     padding: '16px',
     borderRadius: '0 12px 12px 12px',
@@ -32,6 +32,7 @@
 
   const title = document.createElement('span');
   title.innerText = 'Workflow Recorder';
+  title.style.fontSize = '14px';
   const sidePanel = document.createElement('div');
   sidePanel.id = 'workflow-history';
   Object.assign(sidePanel.style, {
@@ -81,6 +82,7 @@
     fontWeight: 'bold',
     fontSize: '12px',
     padding: '4px 10px',
+    height: '30px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
@@ -114,6 +116,8 @@
     borderRadius: '6px',
     cursor: 'pointer',
     display: 'inline-block',
+    width: '60px',
+    height: '30px',
   });
 
   header.appendChild(title);
@@ -137,6 +141,8 @@
     fontSize: '12px',
     display: 'inline-block',
     fontWeight: 'bold',
+    width: '90px',
+    height: '30px',
   });
 
   toggleHistoryBtn.onclick = () => {
