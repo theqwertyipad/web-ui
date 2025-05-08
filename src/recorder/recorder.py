@@ -3,6 +3,7 @@ import datetime
 import json
 import os
 import uuid
+import logging
 from importlib import resources
 from pathlib import Path
 from typing import List, Optional
@@ -29,6 +30,8 @@ class WorkflowStep:
 		# Store additional attributes
 		for key, value in kwargs.items():
 			setattr(self, key, value)
+
+logger = logging.getLogger(__name__)
 
 class WorkflowRecorder:
 	def __init__(self, output_dir: Path, browser_config: Optional[BrowserConfig] = None):
@@ -64,13 +67,13 @@ class WorkflowRecorder:
 			await page.wait_for_selector('#agent-recorder-ui', timeout=2000)
 
 	async def overlay_print(self, message: str, page):
-		print(message)
+		logger.info(message)
 		self._overlay_logs.append(message)
 		await self.ensure_overlay_ready(page)
 		await page.evaluate('(msg) => AgentRecorder.requestOutput(msg)', message)
 
 	async def overlay_input(self, page, mode: str, question: str, placeholder: str = '', choices: list = []) -> str:
-		print(f'[🔧 overlay_input] Asking for: {question}')
+		logger.info(f'GUI asking for: {question}')
 		if self._should_exit:
 			return ''
 
@@ -105,35 +108,35 @@ class WorkflowRecorder:
 		for attempt in range(max_attempts):
 			try:
 				await page.expose_function('notifyPython', self._notify_python)
-				print(f'[🔗] notifyPython exposed on attempt {attempt + 1}')
+				logger.info(f'[🔗] notifyPython exposed on attempt {attempt + 1}')
 				# Mock evaluation to check if the function is exposed
 				is_exposed = await page.evaluate('typeof window.notifyPython === "function"')
 				if is_exposed:
-					print('[✅] notifyPython is callable from the page')
+					logger.info('[✅] notifyPython is callable from the page')
 					# Set up a future to capture the mock call
 					self._mock_future = asyncio.Future()
 					for mock_attempt in range(max_attempts):
 						try:
 							await page.evaluate('window.notifyPython("mock_test", {})')
 							await asyncio.wait_for(self._mock_future, timeout=1.0)
-							print('[✅] Mock call successfully received')
+							logger.info('[✅] Mock call successfully received')
 							return
 						except Exception as mock_err:
-							print(f'[⚠️] Mock call attempt {mock_attempt + 1} failed: {mock_err}')
+							logger.info('[⚠️] Mock call attempt {mock_attempt + 1} failed: {mock_err}')
 							await page.reload()
-							print('[🔄] Page reloaded, retrying the process...')
+							logger.info('[🔄] Page reloaded, retrying the process...')
 							await asyncio.sleep(delay)
-					print('[❌] Failed to receive mock call after maximum attempts')
+					logger.info('[❌] Failed to receive mock call after maximum attempts')
 					continue
 				else:
-					print('[⚠️] notifyPython is not callable, retrying...')
+					logger.info('[⚠️] notifyPython is not callable, retrying...')
 			except Exception as expose_err:
 				if 'has been already registered' in str(expose_err):
 					return
 				else:
-					print(f'[⚠️] Attempt {attempt + 1} failed: {expose_err}')
+					logger.info(f'[⚠️] Attempt {attempt + 1} failed: {expose_err}')
 			await asyncio.sleep(delay)
-		print('[❌] Failed to expose notifyPython after maximum attempts')
+		logger.info('[❌] Failed to expose notifyPython after maximum attempts')
 
 	async def record_workflow(self, url: str, context_config: Optional[BrowserContextConfig] = None):
 		"""Record a workflow by following user clicks and keyboard input"""
@@ -188,7 +191,8 @@ class WorkflowRecorder:
 			async def handle_navigation(frame):
 				if frame == page.main_frame: 
 					if self.current_url != page.url:
-						print(f'Navigation detected: {page.url}')
+						logger.info(f'Navigation detected: {page.url}')
+						await self.update_state(context, page)
 						new_url = page.url
 						self.current_url = new_url
 						if self.recording:
@@ -204,10 +208,9 @@ class WorkflowRecorder:
 
 			await asyncio.sleep(1)
 			await self.overlay_print(f'Navigating to {url}...', page)
-			await self.overlay_print(f'If the actions are not recorded, refresh the page!', page) # This isn't the best solution, but the reload is sometimes needed to initialize the eventhandlers correctly
+			await self.overlay_print(f'If the actions are not recorded, refresh the page!', page)
 			try:
 				await page.goto(url, wait_until='domcontentloaded', timeout=10000)
-				print('Page loaded!')
 			except Exception as e:
 				await self.overlay_print(f'Error navigating to {url}: {str(e)}', page)
 				return
@@ -216,7 +219,7 @@ class WorkflowRecorder:
 				page = await context.get_current_page()
 				# 🔓 Allow control and submitOverlayInput events always
 				if event_type not in ['control', 'submitOverlayInput', 'mock_test'] and not self.recording:
-					await self.overlay_print(f"⚠️ Received '{event_type}' while not recording — ignoring.", page)
+					await self.overlay_print(f"[[⚠️]] Received '{event_type}' while not recording — ignoring.", page)
 					return
 				# Handle mock_test for connection verification
 				if event_type == 'mock_test':
@@ -244,7 +247,7 @@ class WorkflowRecorder:
 						**attributes
 					)
 					await self.add_step(step, page)
-					await self.overlay_print(f'🖱️ Recorded click', page)
+					await self.overlay_print(f'[🖱️] Recorded click', page)
 					await self.update_state(context, page)
 
 				elif event_type == 'elementInput':
@@ -263,7 +266,7 @@ class WorkflowRecorder:
 						**attributes
 					)
 					await self.add_step(step, page)
-					await self.overlay_print(f"⌨️ Recorded {getattr(step, 'elementTag', 'unknown element')} into", page)
+					await self.overlay_print(f'[⌨️] Recorded {getattr(step, "elementTag", "unknown element")} into', page)
 					await self.update_state(context, page)
 				elif event_type == 'elementChange':
 					attributes = {
@@ -282,7 +285,7 @@ class WorkflowRecorder:
 						**attributes
 					)
 					await self.add_step(step, page)
-					await self.overlay_print(f'☑️ Recorded a selection', page)
+					await self.overlay_print(f'[☑️] Recorded a selection', page)
 					await self.update_state(context, page)
 				elif event_type == 'keydownEvent':
 					attributes = {
@@ -300,7 +303,7 @@ class WorkflowRecorder:
 						**attributes
 					)
 					await self.add_step(step, page)
-					await self.overlay_print(f'⌨️ Recorded keydown: {payload.get("key", "")}', page)
+					await self.overlay_print(f'[⌨️] Recorded keydown: {payload.get("key", "")}', page)
 					await self.update_state(context, page)
 
 				elif event_type == 'navigation':
@@ -312,12 +315,11 @@ class WorkflowRecorder:
 						timestamp=int(datetime.datetime.now().timestamp() * 1000)
 					)
 					await self.add_step(step, page)
-					await self.overlay_print(f'🌐 Recorded navigation to {url}', page)
+					await self.overlay_print(f'[🌐] Recorded navigation to {url}', page)
 					await self.update_state(context, page)
 				
 				elif event_type == 'deleteStep':
 					index = payload.get('index', '')
-					print(index)
 					if isinstance(index, int) and 0 <= index < len(self.steps):
 						removed_step = self.steps.pop(index)
 						await self.overlay_print(f'Deleted step {removed_step.step_number}: {removed_step.type}', page)
@@ -325,14 +327,13 @@ class WorkflowRecorder:
 						for idx, step in enumerate(self.steps):
 							step.step_number = idx + 1
 					else:
-						await self.overlay_print('⚠️ Invalid index for deletion', page)
+						await self.overlay_print('[⚠️] Invalid index for deletion', page)
 					await self.update_state(context, page)
 				
 				elif event_type == 'reorderSteps':
 					step_data = payload.get('step', {})
-					print(step_data)
 					if not step_data:
-						await self.overlay_print('⚠️ No step provided for reordering', page)
+						await self.overlay_print('[⚠️] No step provided for reordering', page)
 						return
 
 					action = step_data.get('action', '')
@@ -342,13 +343,13 @@ class WorkflowRecorder:
 
 					# Validate indices
 					if not isinstance(original_index, int) or not isinstance(new_index, int):
-						await self.overlay_print('⚠️ Invalid or missing indices for reordering', page)
+						await self.overlay_print('[⚠️] Invalid or missing indices for reordering', page)
 						return
 					if original_index < 0 or original_index >= len(self.steps) or new_index < 0 or new_index >= len(self.steps):
-						await self.overlay_print('⚠️ Index out of bounds for reordering', page)
+						await self.overlay_print('[⚠️] Index out of bounds for reordering', page)
 						return
 					if original_index == new_index:
-						await self.overlay_print('ℹ️ No change in step position', page)
+						await self.overlay_print('[ℹ️] No change in step position', page)
 						return
 
 					# Validate the step at original_index matches action and cssSelector
@@ -356,19 +357,18 @@ class WorkflowRecorder:
 					expected_key = (action, css_selector) if action.lower() != 'navigation' else (action,)
 					actual_key = (moved_step.type, moved_step.cssSelector) if moved_step.type.lower() != 'navigation' else (moved_step.type,)
 					if expected_key != actual_key:
-						await self.overlay_print(f'⚠️ Step at index {original_index} does not match provided action or selector', page)
+						await self.overlay_print(f'[⚠️] Step at index {original_index} does not match provided action or selector', page)
 						return
 
 					# Move the step
 					self.steps.pop(original_index)
 					self.steps.insert(new_index, moved_step)
-					print(f'Moved step from index {original_index} to {new_index}')
 
 					# Update step_number for all steps
 					for idx, step in enumerate(self.steps):
 						step.step_number = idx + 1
 
-					await self.overlay_print(f'🔄 Moved step', page)
+					await self.overlay_print(f'[🔄] Moved step', page)
 					await self.update_state(context, page)
 
 				elif event_type == 'control':
@@ -376,10 +376,10 @@ class WorkflowRecorder:
 					if action == 'start':
 						await self.set_recording_state(page, True)
 						self._workflow_saved = False
-						await self.overlay_print('🟢 Recording started.', page)
+						await self.overlay_print(f'[🟢] Recording started.', page)
 						# Setting as first step the URL
 						step = WorkflowStep(
-							step_number=0,
+							step_number=1,
 							type='navigation',
 							url=page.url,
 							timestamp=int(datetime.datetime.now().timestamp() * 1000)
@@ -388,13 +388,12 @@ class WorkflowRecorder:
 					elif action == 'finish':
 						await self.set_recording_state(page, False)
 						self._active_input = None  # This can cause problems in the future
-						await self.overlay_print('⛔️ Recording stopped. Saving workflow...', page)
-						self.save_workflow()
+						await self.overlay_print('[⛔️] Recording stopped. Saving recording...', page)
+						await self.save_workflow(page)
 
 						# Delay to allow the GUI to render non-recording mode fully. This is important
 						await asyncio.sleep(1)
 						self.steps =[]
-						await context.remove_highlights()
 						await self.update_state(context, page)
 
 					elif action == 'update':
@@ -404,19 +403,19 @@ class WorkflowRecorder:
 					elif action == 'back':
 						if self.steps:
 							removed = self.steps.pop()
-							await self.overlay_print(f'↩️ Removed step {removed.step_number}: {removed.type}', page)
+							await self.overlay_print(f'[↩️] Removed step {removed.step_number}: {removed.type}', page)
 							await self.update_state(context, page)
 					elif action == 'close':
 						await self.set_recording_state(page, False)
 						self._active_input = None
-						self._should_exit = True
 
 						if hasattr(self, '_input_future') and not self._input_future.done():
 							self._input_future.cancel()
 
-						self.save_workflow()
-						await self.overlay_print('⛔️ Recording stopped. Saving workflow...', page)
-						await self.overlay_print('📁 Closing recorder session...', page)
+						await self.overlay_print('[⛔️] Recording stopped. Saving recording...', page)
+						await self.save_workflow(page)
+						await self.overlay_print('[[📁]] Closing recorder session...', page)
+						self._should_exit = True
 						await context.remove_highlights()
 						self._recording_complete.set()
 
@@ -424,7 +423,7 @@ class WorkflowRecorder:
 			await self.expose_notify_python(page)
 
 			def handle_browser_close(page):
-				print('Browser closed by user.')
+				logger.info('Recorder browser instance closed by user forcefully.')
 				self._should_exit = True
 				self._recording_complete.set()
 			page.on('close', handle_browser_close)
@@ -432,18 +431,17 @@ class WorkflowRecorder:
 			await self._recording_complete.wait()
 
 		except Exception as e:
-			await self.overlay_print(f'An unexpected error occurred during recording: {str(e)}', page)
+			await self.overlay_print(f'[🔴] An unexpected error occurred during recording: {str(e)}', page)
 			if self.steps:
-				await self.overlay_print('Attempting to save partial workflow due to error...', page)
-				self.save_workflow()
+				await self.overlay_print('Attempting to save partial recording due to error...', page)
+				await self.save_workflow(page)
 			raise
 
 		finally:
 			self.recording = False
 			if self.steps and not self._workflow_saved:
-				await self.overlay_print('Finalizing workflow save...', page)
-				self.save_workflow()
-				await self.overlay_print('Workflow saving process complete.', page)
+				await self.overlay_print('Finalizing recodring save...', page)
+				await self.save_workflow(page)
 			elif not self.steps:
 				await self.overlay_print('No steps were recorded.', page)
 			
@@ -454,21 +452,19 @@ class WorkflowRecorder:
 			if context:
 				try:
 					await context.close()
-					print('Browser context closed.')
+					logger.info('Recorder browser context closed.')
 				except Exception as close_err:
 					await self.overlay_print(f'Warning: Error closing browser context: {str(close_err)}', page)
 			
 
-	def save_workflow(self):
-		"""Save the recorded workflow to a file"""
+	async def save_workflow(self, page):
+		"""Save the recorded workflow to a file and return success status"""
 		if self._workflow_saved:
-			print('Workflow already saved, skipping.')
-			return
+			await self.overlay_print('[↩️] Recording already saved, skipping.', page)
 		# Check if there are no steps or only one step with 'navigation' type
 		if not self.steps or (len(self.steps) == 1 and self.steps[0].type == 'navigation'):
-			print('No meaningful steps to save, skipping workflow save.')
 			self._workflow_saved = True
-			return
+			await self.overlay_print('[↩️] No meaningful steps to save, skipping recording save.', page)
 		try:
 			# Use a default directory for the output
 			output_dir_path = self.output_dir
@@ -478,11 +474,11 @@ class WorkflowRecorder:
 			filename = f'recording_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
 			filepath = os.path.join(output_dir_path, filename)
 
-			print(f'Attempting to save recording to: {filepath}')
+			logger.info(f'Attempting to save recording to: {filepath}')
 
 			workflow_data = {
 				'timestamp': datetime.datetime.now().isoformat(),
-				'action_name': self.action_name,
+				'name': self.action_name,
 				'total_steps': len(self.steps),
 				'description': self.description,
 				'steps': [
@@ -499,20 +495,20 @@ class WorkflowRecorder:
 			# Verify the file was created
 			if os.path.exists(filepath):
 				file_size = os.path.getsize(filepath)
-				print(f'✅ Workflow successfully saved to {filepath} ({file_size} bytes)')
 				self._workflow_saved = True
+				await self.overlay_print('[✅] Workflow saved successfully.', page)
 			else:
-				print(f'❌ Error: File was not created at {filepath}')
+				await self.overlay_print('[❌] Failed to save workflow.', page)
 
 		except Exception as e:
-			print(f'❌ Error saving workflow: {str(e)}')
+			logger.info(f'[❌] Error saving recording: {str(e)}')
 			# Try to save to a fallback location
 			try:
 				fallback_path = os.path.join(os.getcwd(), 'workflow_fallback.json')
-				print(f'Attempting to save to fallback location: {fallback_path}')
+				logger.info(f'Attempting to save to fallback location: {fallback_path}')
 				with open(fallback_path, 'w', encoding='utf-8') as f:
 					json.dump(workflow_data, f, indent=4, ensure_ascii=False)
-				print(f'✅ Workflow saved to fallback location: {fallback_path}')
 				self._workflow_saved = True
+				await self.overlay_print('[✅] Workflow saved successfully.', page)
 			except Exception as fallback_error:
-				print(f'❌ Failed to save to fallback location: {str(fallback_error)}')
+				await self.overlay_print(f'[❌] Failed to save workflow: {str(fallback_error)}', page)
