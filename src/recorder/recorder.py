@@ -67,10 +67,13 @@ class WorkflowRecorder:
 			await page.wait_for_selector('#agent-recorder-ui', timeout=2000)
 
 	async def overlay_print(self, message: str, page):
-		logger.info(message)
-		self._overlay_logs.append(message)
-		await self.ensure_overlay_ready(page)
-		await page.evaluate('(msg) => AgentRecorder.requestOutput(msg)', message)
+		try:
+			logger.info(message)
+			self._overlay_logs.append(message)
+			await self.ensure_overlay_ready(page)
+			await page.evaluate('(msg) => AgentRecorder.requestOutput(msg)', message)
+		except Exception as e:
+			logger.error(f"Error displaying overlay message: {str(e)}")
 
 	async def overlay_input(self, page, mode: str, question: str, placeholder: str = '', choices: list = []) -> str:
 		logger.info(f'GUI asking for: {question}')
@@ -98,10 +101,13 @@ class WorkflowRecorder:
 	async def add_step(self, step: WorkflowStep, page):
 		self.steps.append(step)
 		selector = step.cssSelector if step.cssSelector else "no_selector"
-		await page.evaluate(
-			'(data) => AgentRecorder.addWorkflowStep(data.action, data.cssSelector)',
-			{"action": step.type, "cssSelector": selector}
-		)
+		try:
+			await page.evaluate(
+				'(data) => AgentRecorder.addWorkflowStep(data.action, data.cssSelector)',
+				{"action": step.type, "cssSelector": selector}
+			)
+		except Exception as e:
+			await self.overlay_print(f"[⚠️] Error adding step after load: {str(e)}", page)
 
 	async def expose_notify_python(self, page, max_attempts=2, delay=0.2):
 		"""Attempt to expose the notifyPython function with retries."""
@@ -440,7 +446,7 @@ class WorkflowRecorder:
 		finally:
 			self.recording = False
 			if self.steps and not self._workflow_saved:
-				await self.overlay_print('Finalizing recodring save...', page)
+				await self.overlay_print('Finalizing recording save...', page)
 				await self.save_workflow(page)
 			elif not self.steps:
 				await self.overlay_print('No steps were recorded.', page)
@@ -461,10 +467,12 @@ class WorkflowRecorder:
 		"""Save the recorded workflow to a file and return success status"""
 		if self._workflow_saved:
 			await self.overlay_print('[↩️] Recording already saved, skipping.', page)
+			return
 		# Check if there are no steps or only one step with 'navigation' type
 		if not self.steps or (len(self.steps) == 1 and self.steps[0].type == 'navigation'):
 			self._workflow_saved = True
 			await self.overlay_print('[↩️] No meaningful steps to save, skipping recording save.', page)
+			return
 		try:
 			# Use a default directory for the output
 			output_dir_path = self.output_dir
@@ -496,9 +504,9 @@ class WorkflowRecorder:
 			if os.path.exists(filepath):
 				file_size = os.path.getsize(filepath)
 				self._workflow_saved = True
-				await self.overlay_print('[✅] Workflow saved successfully.', page)
+				await self.overlay_print('[✅] Recording saved successfully.', page)
 			else:
-				await self.overlay_print('[❌] Failed to save workflow.', page)
+				await self.overlay_print('[❌] Failed to save recording.', page)
 
 		except Exception as e:
 			logger.info(f'[❌] Error saving recording: {str(e)}')
@@ -509,6 +517,6 @@ class WorkflowRecorder:
 				with open(fallback_path, 'w', encoding='utf-8') as f:
 					json.dump(workflow_data, f, indent=4, ensure_ascii=False)
 				self._workflow_saved = True
-				await self.overlay_print('[✅] Workflow saved successfully.', page)
+				await self.overlay_print('[✅] Recording saved successfully.', page)
 			except Exception as fallback_error:
-				await self.overlay_print(f'[❌] Failed to save workflow: {str(fallback_error)}', page)
+				await self.overlay_print(f'[❌] Failed to save recording: {str(fallback_error)}', page)
