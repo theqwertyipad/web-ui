@@ -491,6 +491,8 @@ class Workflow:
             "string": str,
             "number": float,
             "bool": bool,
+            "integer": int,
+            "boolean": bool,
         }
         fields: Dict[str, tuple[type, Any]] = {}
         for name, spec in props.items():

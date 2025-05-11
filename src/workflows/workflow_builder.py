@@ -230,7 +230,7 @@ def parse_session(
     if "```json" in llm_content:
         # Find the start and end of the json block
         start_index = llm_content.find("```json") + len("```json\n")
-        end_index = llm_content.rfind("```")
+        end_index = llm_content.find("```", start_index) 
         if start_index != -1 and end_index != -1 and start_index < end_index:
             json_content = llm_content[start_index:end_index].strip()
     elif llm_content.startswith("```"):
