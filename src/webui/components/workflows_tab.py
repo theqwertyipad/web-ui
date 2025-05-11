@@ -132,15 +132,27 @@ def create_workflows_tab(webui_manager: WebuiManager):
         with gr.TabItem("🛠️ Workflow Builder"):
             with gr.Row():
                 with gr.Column():
-                    gr.Markdown("### Choose the recording from here:")
+                    gr.Markdown("## Choose the recording from here...")
+                    gr.Markdown("### Select a recording from the dropdown below.")
+                    gr.Markdown("### This will be used to generate your workflow.")
                     session_dropdown = gr.Dropdown(
                         label="Select Recorded Session JSON",
                         choices=_list_saved_recordings(),
                         interactive=True
                     )
                     refresh_sessions_button = gr.Button("Refresh Recordings", variant="secondary")
+                with gr.Column():
+                    gr.Markdown("## ...or edit an existing workflow!")
+                    gr.Markdown("### You can select any previously saved workflow to modify it further.")
+                    gr.Markdown("### ⚠️ Warning: Selecting a workflow will overwrite current edits and generations!")
+                    workflows_edit_dd = gr.Dropdown(
+                        label="Saved Workflows",
+                        choices=_list_saved_workflows(),
+                        interactive=True
+                    )
+                    refresh_workflows_button = gr.Button("Refresh Workflows", variant="secondary")
             with gr.Row():
-                gr.Markdown("### Create an Executable Workflow from the chosen Recording")
+                    gr.Markdown("### Create an Executable Workflow from the Chosen Recording")
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("#### Step 1: Let AI Build the Workflow")
@@ -175,7 +187,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                         - Click 'Update Inputs' to apply changes to the workflow.
                         """
                     )
-                    pydantic_types = ["string", "number", "boolean", "array"]
+                    pydantic_types = ["string", "number", "boolean", "integer"]
                     name_boxes = []
                     type_dropdowns = []
                     required_dropdowns = []
@@ -206,9 +218,12 @@ def create_workflows_tab(webui_manager: WebuiManager):
                     gr.Markdown(
                         "### Give your generated workflow a name and save it. To run it, switch to the **🚀 Run Workflow** tab."
                     )
+                    gr.Markdown(
+                        "### Saving the workflow with an already existing name will overwrite that workflow with the new one!"
+                    )
                     generated_filename_tb = gr.Textbox(
                         label="Filename (.json)",
-                        placeholder="ai_workflow.json",
+                        placeholder="search_google.json",
                         lines=1,
                         interactive=True
                     )
@@ -227,7 +242,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
                         label="Upload Workflow JSON", file_types=[".json"], interactive=True
                     )
                 with gr.Column():
-                    gr.Markdown("### Or run a saved workflow")
+                    gr.Markdown("### ..or run a saved workflow!")
                     saved_workflows_dd = gr.Dropdown(
                         label="Select from list",
                         choices=_list_saved_workflows(),
@@ -245,14 +260,14 @@ def create_workflows_tab(webui_manager: WebuiManager):
             with gr.Row():
                 with gr.Column():
                     uploaded_workflow_inputs_json = gr.Textbox(
-                        label="Run with pre-determined inputs (JSON)", placeholder="{}", lines=3, interactive=True
+                        label="Run with pre-determined inputs (JSON)", placeholder="{}", lines=4, interactive=True
                     )
                     run_uploaded_button = gr.Button("Run with JSON", variant="primary")
                 with gr.Column():
                     uploaded_tool_input = gr.Textbox(
                         label="Let AI decide based on your prompt what to put in the input schema (NLP)",
-                        placeholder="Describe what to do",
-                        lines=1,
+                        placeholder="Fill the form with the todays time...",
+                        lines=4,
                         interactive=True,
                     )
                     run_uploaded_tool_button = gr.Button("Run as Tool", variant="primary")
@@ -815,7 +830,7 @@ def create_workflows_tab(webui_manager: WebuiManager):
             props = {}
             required_fields = []
 
-        new_state = not showing
+        new_state = True  # Always set to True so rows will be showing
         num_fields = len(props) if new_state else 0
 
         row_updates = []
@@ -920,12 +935,11 @@ def create_workflows_tab(webui_manager: WebuiManager):
         outputs=[workflow_chat, generated_json],
     ).then(
         fn=toggle_rows,
-        inputs=[generated_json, show_rows_state],  # assuming False as default for "showing"
+        inputs=[generated_json, show_rows_state],
         outputs=[show_rows_state, row_step_map] +
                 [el for quad in zip(name_boxes, type_dropdowns, required_dropdowns, row_containers) for el in quad] +
                 [update_inputs_button, generated_json]
     )
-
     update_inputs_button.click(
         fn=update_json_with_deletion,
         inputs=[*sum(zip(name_boxes, type_dropdowns, required_dropdowns), ())] + [row_step_map, generated_json],
@@ -941,6 +955,27 @@ def create_workflows_tab(webui_manager: WebuiManager):
         inputs=None,
         outputs=[session_dropdown]
     )
+    refresh_workflows_button.click(
+        fn=lambda: gr.update(choices=_list_saved_workflows()),
+        inputs=None,
+        outputs=[workflows_edit_dd],
+    )
+    workflows_edit_dd.change(
+        fn=lambda x: (_load_workflow_file(x)[0] if x else None),
+        inputs=[workflows_edit_dd],
+        outputs=[generated_json],
+    ).then(
+        fn=toggle_rows,
+        inputs=[generated_json, show_rows_state],
+        outputs=[show_rows_state, row_step_map] +
+                [el for quad in zip(name_boxes, type_dropdowns, required_dropdowns, row_containers) for el in quad] +
+                [update_inputs_button, generated_json]
+    ).then(
+        fn=lambda x: gr.update(value=x),
+        inputs=[workflows_edit_dd],
+        outputs=[generated_filename_tb]
+    )
+
 
     # Run Workflow Tab Callbacks
     refresh_saved_button.click(
