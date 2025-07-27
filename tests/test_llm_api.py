@@ -38,6 +38,7 @@ def create_message_content(text, image_path=None):
 def get_env_value(key, provider):
     env_mappings = {
         "openai": {"api_key": "OPENAI_API_KEY", "base_url": "OPENAI_ENDPOINT"},
+        "openrouter": {"api_key": "OPENROUTER_API_KEY", "base_url": "OPENROUTER_ENDPOINT"},
         "azure_openai": {"api_key": "AZURE_OPENAI_API_KEY", "base_url": "AZURE_OPENAI_ENDPOINT"},
         "google": {"api_key": "GOOGLE_API_KEY"},
         "deepseek": {"api_key": "DEEPSEEK_API_KEY", "base_url": "DEEPSEEK_ENDPOINT"},

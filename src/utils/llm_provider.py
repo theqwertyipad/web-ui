@@ -205,6 +205,18 @@ def get_llm_model(provider: str, **kwargs):
             base_url=base_url,
             api_key=api_key,
         )
+    elif provider == "openrouter":
+        if not kwargs.get("base_url", ""):
+            base_url = os.getenv("OPENROUTER_ENDPOINT", "https://openrouter.ai/api/v1")
+        else:
+            base_url = kwargs.get("base_url")
+
+        return ChatOpenAI(
+            model=kwargs.get("model_name", "deepseek/deepseek-r1:free"),
+            temperature=kwargs.get("temperature", 0.0),
+            base_url=base_url,
+            api_key=api_key,
+        )
     elif provider == "grok":
         if not kwargs.get("base_url", ""):
             base_url = os.getenv("GROK_ENDPOINT", "https://api.x.ai/v1")
