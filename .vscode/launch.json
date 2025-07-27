@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Docker Compose (linux/arm64)",
+      "type": "pwa-node",
+      "request": "launch",
+      "skipFiles": ["<node_internals>/**"],
+      "preLaunchTask": "Docker Compose Up (linux/arm64)",
+      "program": "${workspaceFolder}/index.js", // or your main file
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    }
+  ]
+}
+
